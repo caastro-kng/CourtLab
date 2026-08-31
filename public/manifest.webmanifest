@@ -1,18 +1,42 @@
 {
+  "id": "/",
   "name": "CourtLab - Treinamento de Basquete",
   "short_name": "CourtLab",
-  "description": "Plataforma brasileira de desenvolvimento técnico e treinamento individual de basquete.",
+  "description": "Plataforma brasileira de desenvolvimento técnico e treinamento individual de basquete. Treine, evolua e leve para o jogo.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#080A0D",
   "theme_color": "#080A0D",
   "lang": "pt-BR",
+  "categories": ["sports", "fitness", "education"],
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Treinar agora",
+      "short_name": "Treinar",
+      "url": "/treinar",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Biblioteca de drills",
+      "short_name": "Biblioteca",
+      "url": "/biblioteca",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
     }
   ]
 }
