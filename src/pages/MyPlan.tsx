@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Calendar,
+  CalendarDays,
   Flame,
   CheckCircle2,
   Clock,
@@ -8,322 +8,417 @@ import {
   Play,
   RotateCcw,
   Plus,
-  Layers,
   ChevronRight,
-  Sparkles,
-  ArrowRight,
-  Coffee
+  Coffee,
+  Trophy,
+  HeartPulse,
+  CircleDot,
+  Copy,
+  X,
+  Pencil,
+  Zap,
+  Activity
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { WORKOUTS_DATA } from '../data/workouts';
-import { PROGRAMS_DATA } from '../data/programs';
 import { Workout } from '../types';
 
-export const MyPlan: React.FC = () => {
-  const { weeklyPlan, updateDayPlan, startWorkout, getWorkoutById } = usePlayer();
-  const [selectedDay, setSelectedDay] = useState<number>(4); // Thursday default (Hoje)
-  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+type SessionPreset = 'workout' | 'pickup' | 'game' | 'gym' | 'rest';
 
-  const activeProgram = PROGRAMS_DATA[0]; // COMPLETE GUARD
+const getTodayPlanDay = () => {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay;
+};
+
+const inferSessionType = (title: string, isRest: boolean): SessionPreset => {
+  const normalized = title.toLowerCase();
+  if (isRest) return 'rest';
+  if (normalized.includes('rach') || normalized.includes('pickup')) return 'pickup';
+  if (normalized.includes('jogo') || normalized.includes('game')) return 'game';
+  if (normalized.includes('academia') || normalized.includes('muscula')) return 'gym';
+  return 'workout';
+};
+
+const sessionMeta: Record<SessionPreset, { label: string; detail: string; icon: React.ElementType }> = {
+  workout: { label: 'Treino técnico', detail: 'Sessão individual de quadra', icon: Flame },
+  pickup: { label: 'Rachão', detail: 'Aplicação em jogo e leitura', icon: CircleDot },
+  game: { label: 'Jogo', detail: 'Competição / Game Day', icon: Trophy },
+  gym: { label: 'Academia', detail: 'Força, potência e prevenção', icon: Dumbbell },
+  rest: { label: 'Recuperação', detail: 'Descanso e mobilidade', icon: Coffee }
+};
+
+export const MyPlan: React.FC = () => {
+  const {
+    weeklyPlan,
+    updateDayPlan,
+    startWorkout,
+    getWorkoutById,
+    getExerciseById,
+    workoutLogs
+  } = usePlayer();
+
+  const today = getTodayPlanDay();
+  const [selectedDay, setSelectedDay] = useState<number>(today);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
   const currentDayData = weeklyPlan.find((d) => d.dayOfWeek === selectedDay) || weeklyPlan[0];
   const workoutForSelectedDay: Workout | undefined = currentDayData.workoutId
     ? getWorkoutById(currentDayData.workoutId)
     : undefined;
 
-  const handleSwapWorkout = (newWorkoutId: string, title: string) => {
+  const selectedSessionType = inferSessionType(currentDayData.customTitle, currentDayData.isRest);
+  const selectedSessionMeta = sessionMeta[selectedSessionType];
+
+  const summary = useMemo(() => {
+    const completed = weeklyPlan.filter((day) => day.completed && !day.isRest).length;
+    const planned = weeklyPlan.filter((day) => !day.isRest).length;
+    const rest = weeklyPlan.filter((day) => day.isRest).length;
+    const estimatedMinutes = weeklyPlan.reduce((sum, day) => {
+      if (!day.workoutId) return sum;
+      return sum + (getWorkoutById(day.workoutId)?.estimatedMinutes || 0);
+    }, 0);
+    return { completed, planned, rest, estimatedMinutes };
+  }, [weeklyPlan, getWorkoutById]);
+
+  const handleToggleComplete = () => {
     updateDayPlan(selectedDay, {
-      workoutId: newWorkoutId,
-      customTitle: title,
-      isRest: false
+      completed: !currentDayData.completed,
+      completedAt: !currentDayData.completed ? new Date().toISOString() : undefined
     });
-    setIsSwapModalOpen(false);
   };
 
-  const handleSetRestDay = () => {
+  const handleSwapWorkout = (workout: Workout) => {
     updateDayPlan(selectedDay, {
-      workoutId: undefined,
-      customTitle: 'Descanso Ativo e Recuperação',
-      isRest: true
+      workoutId: workout.id,
+      customTitle: workout.title,
+      isRest: false,
+      completed: false,
+      completedAt: undefined
     });
-    setIsSwapModalOpen(false);
+    setIsEditOpen(false);
   };
 
-  const handleToggleDayComplete = (dayOfWeek: number, currentStatus: boolean) => {
-    updateDayPlan(dayOfWeek, {
-      completed: !currentStatus,
-      completedAt: !currentStatus ? new Date().toISOString() : undefined
+  const setPreset = (type: SessionPreset) => {
+    const labels: Record<SessionPreset, string> = {
+      workout: 'Treino Técnico Individual',
+      pickup: 'Rachão / Pickup Game',
+      game: 'Game Day',
+      gym: 'Academia — Força e Potência',
+      rest: 'Descanso e Recuperação'
+    };
+
+    updateDayPlan(selectedDay, {
+      workoutId: type === 'workout' ? currentDayData.workoutId : undefined,
+      customTitle: labels[type],
+      isRest: type === 'rest',
+      completed: false,
+      completedAt: undefined
+    });
+    setIsEditOpen(false);
+  };
+
+  const duplicateSelectedDayToNext = () => {
+    const nextDay = selectedDay === 7 ? 1 : selectedDay + 1;
+    updateDayPlan(nextDay, {
+      workoutId: currentDayData.workoutId,
+      customTitle: currentDayData.customTitle,
+      isRest: currentDayData.isRest,
+      completed: false,
+      completedAt: undefined
     });
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* 1. Header with Active Program Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#191E24] via-[#12161C] to-[#0D1014] border border-[#1F2630] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-7 animate-in fade-in duration-300">
+      <section className="flex flex-col xl:flex-row xl:items-end justify-between gap-5">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono-num font-bold uppercase tracking-wider text-[#FF6B1A] mb-1">
-            <Layers className="w-4 h-4" />
-            <span>Programa em Andamento</span>
+          <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-[0.18em] text-[#FF6B1A] mb-2">
+            <CalendarDays className="w-4 h-4" />
+            Semana de desenvolvimento
           </div>
-          <h1 className="text-3xl sm:text-4xl font-heading text-white tracking-tight leading-tight">
-            {activeProgram.title} — <span className="text-[#FF8D4D]">Semana 1 de {activeProgram.durationWeeks}</span>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading text-white leading-none tracking-tight">
+            MEU PLANO
           </h1>
-          <p className="text-xs sm:text-sm text-[#9AA1AA] mt-1 max-w-xl">
-            {activeProgram.subtitle} Meta da semana: Fundamentos + Controle de Bola Estacionário.
+          <p className="text-sm text-[#9AA1AA] mt-2 max-w-2xl">
+            Organize treino técnico, rachão, jogo, academia e recuperação em uma única rotina semanal.
           </p>
         </div>
 
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="p-3 rounded-2xl bg-[#0D1014] border border-[#1F2630] text-center min-w-[100px]">
-            <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Frequência</span>
-            <span className="text-xl font-mono-num font-bold text-white">4x / semana</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full xl:w-auto">
+          <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] px-4 py-3">
+            <span className="text-[10px] uppercase font-bold text-[#707985] block">Planejados</span>
+            <strong className="text-xl text-white font-mono-num">{summary.planned}</strong>
           </div>
-          <div className="p-3 rounded-2xl bg-[#0D1014] border border-[#1F2630] text-center min-w-[100px]">
-            <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Concluídos</span>
-            <span className="text-xl font-mono-num font-bold text-emerald-400">3 / 4 dias</span>
+          <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] px-4 py-3">
+            <span className="text-[10px] uppercase font-bold text-[#707985] block">Concluídos</span>
+            <strong className="text-xl text-emerald-400 font-mono-num">{summary.completed}</strong>
+          </div>
+          <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] px-4 py-3">
+            <span className="text-[10px] uppercase font-bold text-[#707985] block">Recuperação</span>
+            <strong className="text-xl text-white font-mono-num">{summary.rest}</strong>
+          </div>
+          <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] px-4 py-3">
+            <span className="text-[10px] uppercase font-bold text-[#707985] block">Volume</span>
+            <strong className="text-xl text-white font-mono-num">{summary.estimatedMinutes}m</strong>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 2. Interactive 7-Day Calendar Strip */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl sm:text-2xl font-heading text-white flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#FF6B1A]" />
-            Cronograma da Semana
-          </h2>
-          <span className="text-xs text-[#9AA1AA]">Clique em um dia para ver os detalhes</span>
+      <section className="rounded-3xl border border-[#1F2630] bg-[#0D1014] p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-[#707985]">Sua semana</span>
+            <h2 className="text-xl font-heading text-white">Agenda de atleta</h2>
+          </div>
+          <span className="hidden sm:inline text-xs text-[#707985]">Selecione um dia para editar ou iniciar</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
           {weeklyPlan.map((day) => {
             const isSelected = day.dayOfWeek === selectedDay;
-            const isToday = day.dayOfWeek === 4;
+            const isToday = day.dayOfWeek === today;
+            const type = inferSessionType(day.customTitle, day.isRest);
+            const meta = sessionMeta[type];
+            const Icon = meta.icon;
+            const workout = day.workoutId ? getWorkoutById(day.workoutId) : undefined;
 
             return (
-              <div
+              <button
                 key={day.dayOfWeek}
                 onClick={() => setSelectedDay(day.dayOfWeek)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between h-36 ${
+                className={`text-left rounded-2xl border p-3.5 min-h-40 transition-all ${
                   isSelected
-                    ? 'bg-[#FF6B1A]/15 border-[#FF6B1A] shadow-xl shadow-[#FF6B1A]/10 scale-102'
-                    : day.completed
-                    ? 'bg-[#15191F] border-emerald-500/40 hover:border-emerald-500'
-                    : day.isRest
-                    ? 'bg-[#0D1014] border-[#1F2630] opacity-70 hover:opacity-100'
-                    : 'bg-[#11151A] border-[#1F2630] hover:border-[#2B3542]'
+                    ? 'bg-[#FF6B1A]/10 border-[#FF6B1A] shadow-lg shadow-[#FF6B1A]/10'
+                    : 'bg-[#11151A] border-[#1F2630] hover:border-[#343E4B] hover:bg-[#15191F]'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-[#9AA1AA]">{day.dayName}</span>
-                  {isToday && (
-                    <span className="px-1.5 py-0.5 rounded bg-[#FF6B1A] text-white text-[9px] font-black uppercase">
-                      Hoje
-                    </span>
-                  )}
+                <div className="flex items-center justify-between mb-5">
+                  <span className="text-[11px] font-black tracking-wider text-white">{day.dayName}</span>
+                  {isToday ? (
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[#FF6B1A] text-white">Hoje</span>
+                  ) : day.completed ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  ) : null}
                 </div>
 
-                <div>
-                  <h3 className="text-sm font-heading text-white line-clamp-2 leading-tight">
-                    {day.isRest ? 'Descanso Ativo' : day.customTitle}
-                  </h3>
-                  <span className="text-[11px] text-[#9AA1AA] block mt-0.5">
-                    {day.isRest ? 'Alongamento' : 'Treino de Quadra'}
+                <div className="w-9 h-9 rounded-xl bg-[#0D1014] border border-[#1F2630] flex items-center justify-center mb-3">
+                  <Icon className={`w-4.5 h-4.5 ${type === 'rest' ? 'text-amber-400' : 'text-[#FF6B1A]'}`} />
+                </div>
+
+                <div className="min-h-11">
+                  <span className="text-xs font-bold text-white line-clamp-2">{day.customTitle}</span>
+                  <span className="text-[10px] text-[#707985] mt-1 block">{meta.label}</span>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-[#1F2630] text-[10px] text-[#9AA1AA] flex items-center justify-between">
+                  <span>{workout ? `${workout.estimatedMinutes} min` : type === 'rest' ? 'OFF' : 'Sessão livre'}</span>
+                  <span className={day.completed ? 'text-emerald-400' : isSelected ? 'text-[#FF8D4D]' : ''}>
+                    {day.completed ? 'Feito' : 'Planejado'}
                   </span>
                 </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-[#1F2630]/60">
-                  {day.completed ? (
-                    <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Feito
-                    </span>
-                  ) : day.isRest ? (
-                    <span className="text-[11px] text-[#9AA1AA] flex items-center gap-1">
-                      <Coffee className="w-3.5 h-3.5 text-amber-400" />
-                      OFF
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-[#FF8D4D] flex items-center gap-1 font-semibold">
-                      <Flame className="w-3.5 h-3.5 text-[#FF6B1A]" />
-                      Planejado
-                    </span>
-                  )}
-                </div>
-              </div>
+              </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* 3. Selected Day Detailed Inspector */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#0D1014] border border-[#1F2630] space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1F2630] pb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono-num font-bold uppercase tracking-widest text-[#FF6B1A]">
-                {currentDayData.dayName} — Detalhes do Treino
-              </span>
-              {currentDayData.dayOfWeek === 4 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#FF6B1A]/20 text-[#FF8D4D] text-[10px] font-bold uppercase">
-                  Dia Atual
-                </span>
-              )}
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-heading text-white tracking-tight">
-              {currentDayData.isRest ? 'Dia de Recuperação e Mobilidade' : currentDayData.customTitle}
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleToggleDayComplete(selectedDay, !!currentDayData.completed)}
-              className={`px-4 py-2.5 rounded-xl border text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors ${
-                currentDayData.completed
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
-                  : 'bg-[#15191F] text-white border-[#2B3542] hover:bg-[#1E242D]'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              {currentDayData.completed ? 'Marcado como Feito' : 'Marcar como Concluído'}
-            </button>
-
-            <button
-              onClick={() => setIsSwapModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-[#191E24] hover:bg-[#202730] border border-[#2B3542] text-xs font-bold uppercase tracking-wider text-white transition-colors"
-            >
-              Trocar Treino
-            </button>
-          </div>
-        </div>
-
-        {/* Workout or Rest Breakdown */}
-        {workoutForSelectedDay ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-                <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Tempo Estimado</span>
-                <span className="text-xl font-mono-num font-bold text-white flex items-center gap-1.5 mt-1">
-                  <Clock className="w-4 h-4 text-[#FF6B1A]" />
-                  {workoutForSelectedDay.estimatedMinutes} minutos
-                </span>
-              </div>
-              <div className="p-4 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-                <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Volume</span>
-                <span className="text-xl font-mono-num font-bold text-white flex items-center gap-1.5 mt-1">
-                  <Dumbbell className="w-4 h-4 text-[#FF6B1A]" />
-                  {workoutForSelectedDay.exercises.length} Drills
-                </span>
-              </div>
-              <div className="p-4 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-                <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Recompensa</span>
-                <span className="text-xl font-mono-num font-bold text-[#FF6B1A] flex items-center gap-1.5 mt-1">
-                  +{workoutForSelectedDay.xpReward} XP
-                </span>
-              </div>
-            </div>
-
-            {/* List of Drills inside this day's workout */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
+        <div className="rounded-3xl border border-[#1F2630] bg-[#0D1014] overflow-hidden">
+          <div className="p-5 sm:p-6 border-b border-[#1F2630] flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-[#9AA1AA] mb-3">
-                Exercícios Programados Para Este Treino
-              </h3>
-              <div className="space-y-2">
-                {workoutForSelectedDay.exercises.map((item, idx) => {
-                  const drill = WORKOUTS_DATA.flatMap((w) => w.exercises).find((e) => e.exerciseId === item.exerciseId);
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-[#FF6B1A]/20 text-[#FF6B1A] font-mono-num font-bold text-xs flex items-center justify-center border border-[#FF6B1A]/30">
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-semibold text-white">
-                            {item.exerciseId.toUpperCase()} — Drill Específico
-                          </h4>
-                          <span className="text-xs text-[#9AA1AA]">
-                            {item.customSets || 3} Séries • {item.customReps || '15 reps'} • Descanso: {item.restSeconds || 30}s
-                          </span>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF6B1A]">{currentDayData.dayName}</span>
+                {currentDayData.dayOfWeek === today && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] uppercase font-black bg-[#FF6B1A]/15 text-[#FF8D4D] border border-[#FF6B1A]/20">Hoje</span>
+                )}
+                {currentDayData.completed && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] uppercase font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Concluído</span>
+                )}
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-heading text-white">{currentDayData.customTitle}</h2>
+              <p className="text-xs sm:text-sm text-[#9AA1AA] mt-1">{selectedSessionMeta.detail}</p>
+            </div>
+
+            <button
+              onClick={() => setIsEditOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-[#15191F] hover:bg-[#1B2129] border border-[#2B3542] text-xs font-bold text-white flex items-center justify-center gap-2"
+            >
+              <Pencil className="w-4 h-4 text-[#FF6B1A]" />
+              Editar sessão
+            </button>
+          </div>
+
+          {workoutForSelectedDay ? (
+            <div className="p-5 sm:p-6 space-y-6">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-4">
+                  <Clock className="w-4 h-4 text-[#FF6B1A] mb-2" />
+                  <span className="text-[10px] uppercase font-bold text-[#707985] block">Duração</span>
+                  <strong className="text-lg text-white font-mono-num">{workoutForSelectedDay.estimatedMinutes} min</strong>
+                </div>
+                <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-4">
+                  <Activity className="w-4 h-4 text-[#FF6B1A] mb-2" />
+                  <span className="text-[10px] uppercase font-bold text-[#707985] block">Exercícios</span>
+                  <strong className="text-lg text-white font-mono-num">{workoutForSelectedDay.exercises.length}</strong>
+                </div>
+                <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-4">
+                  <Zap className="w-4 h-4 text-[#FF6B1A] mb-2" />
+                  <span className="text-[10px] uppercase font-bold text-[#707985] block">XP</span>
+                  <strong className="text-lg text-[#FF8D4D] font-mono-num">+{workoutForSelectedDay.xpReward}</strong>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs uppercase tracking-wider font-black text-[#9AA1AA]">Sequência do treino</h3>
+                  <span className="text-[10px] text-[#707985]">DRILL → SKILL → GAME</span>
+                </div>
+
+                <div className="space-y-2">
+                  {workoutForSelectedDay.exercises.map((item, idx) => {
+                    const exercise = getExerciseById(item.exerciseId);
+                    return (
+                      <div key={`${item.exerciseId}-${idx}`} className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-3.5 flex items-center gap-3">
+                        <span className="w-7 h-7 rounded-full bg-[#FF6B1A]/10 text-[#FF6B1A] border border-[#FF6B1A]/20 flex items-center justify-center text-[11px] font-black shrink-0">{idx + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-semibold text-white truncate">{exercise?.name || item.exerciseId}</h4>
+                          <p className="text-[11px] text-[#707985] mt-0.5">
+                            {item.customSets || 3} séries • {item.customReps || '15 reps'} • {item.restSeconds || 30}s descanso
+                          </p>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <button
+                  onClick={() => startWorkout(workoutForSelectedDay)}
+                  className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white font-heading uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B1A]/20"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  Iniciar treino
+                </button>
+                <button
+                  onClick={handleToggleComplete}
+                  className={`px-5 py-3.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 ${
+                    currentDayData.completed
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-[#15191F] border-[#2B3542] text-white hover:bg-[#1B2129]'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {currentDayData.completed ? 'Concluído' : 'Marcar como feito'}
+                </button>
               </div>
             </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() => startWorkout(workoutForSelectedDay)}
-                className="py-4 px-8 rounded-2xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white font-heading text-base uppercase tracking-wider transition-all shadow-xl shadow-[#FF6B1A]/30 flex items-center justify-center gap-2 w-full sm:w-auto"
-              >
-                <Flame className="w-5 h-5 fill-current" />
-                Iniciar Treino de {currentDayData.dayName}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Rest Day Guidance */
-          <div className="p-8 rounded-2xl bg-[#15191F] border border-[#1F2630] text-center space-y-4 max-w-xl mx-auto">
-            <div className="w-16 h-16 rounded-full bg-[#1F2630] text-amber-400 mx-auto flex items-center justify-center">
-              <Coffee className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-heading text-white">Dia de Recuperação Ativa</h3>
-            <p className="text-xs sm:text-sm text-[#9AA1AA] leading-relaxed">
-              O descanso é onde a hipertrofia e a consolidação neural dos movimentos acontecem.
-              Recomendamos 15 minutos de liberação miofascial, alongamento estático de isquiotibiais e tornozelos, e boa hidratação.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* 4. Swap Workout Modal */}
-      {isSwapModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-xl bg-[#0D1014] border border-[#1F2630] rounded-3xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1F2630] pb-4">
-              <h3 className="text-xl font-heading text-white">
-                Trocar Treino de {currentDayData.dayName}
-              </h3>
-              <button
-                onClick={() => setIsSwapModalOpen(false)}
-                className="text-xs text-[#9AA1AA] hover:text-white"
-              >
-                Cancelar
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                onClick={handleSetRestDay}
-                className="w-full p-3.5 rounded-xl bg-[#15191F] hover:bg-[#1C222B] border border-amber-500/30 text-left flex items-center justify-between text-amber-400 font-semibold text-xs sm:text-sm transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <Coffee className="w-4 h-4" />
-                  Definir como Dia de Descanso (OFF)
-                </span>
-                <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Selecionar</span>
-              </button>
-
-              {WORKOUTS_DATA.map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => handleSwapWorkout(w.id, w.title)}
-                  className="w-full p-3.5 rounded-xl bg-[#15191F] hover:bg-[#1C222B] border border-[#1F2630] hover:border-[#FF6B1A]/60 text-left flex items-center justify-between transition-colors group"
-                >
-                  <div>
-                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-[#FF6B1A] transition-colors block">
-                      {w.title}
-                    </span>
-                    <span className="text-[11px] text-[#9AA1AA]">
-                      {w.estimatedMinutes} min • {w.exercises.length} drills • {w.level}
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#9AA1AA] group-hover:text-[#FF6B1A] group-hover:translate-x-1 transition-all" />
+          ) : (
+            <div className="p-5 sm:p-6">
+              <div className="rounded-3xl bg-[#11151A] border border-[#1F2630] p-6 sm:p-8 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center mx-auto mb-4">
+                  {React.createElement(selectedSessionMeta.icon, { className: `w-6 h-6 ${selectedSessionType === 'rest' ? 'text-amber-400' : 'text-[#FF6B1A]'}` })}
+                </div>
+                <h3 className="text-xl font-heading text-white">{selectedSessionMeta.label}</h3>
+                <p className="text-sm text-[#9AA1AA] mt-2 max-w-lg mx-auto">
+                  {selectedSessionType === 'rest'
+                    ? 'Use o dia para recuperar. Mobilidade leve, sono e hidratação entram no plano tanto quanto os treinos.'
+                    : 'Essa sessão fica registrada no seu plano como aplicação ou desenvolvimento físico. Você pode trocar por um treino técnico a qualquer momento.'}
+                </p>
+                <button onClick={handleToggleComplete} className="mt-5 px-5 py-3 rounded-xl bg-[#15191F] border border-[#2B3542] text-xs font-bold text-white inline-flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {currentDayData.completed ? 'Sessão concluída' : 'Marcar como concluída'}
                 </button>
-              ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="space-y-4">
+          <div className="rounded-3xl border border-[#1F2630] bg-[#0D1014] p-5">
+            <span className="text-[10px] uppercase font-black tracking-wider text-[#707985]">Ações rápidas</span>
+            <div className="mt-3 space-y-2">
+              <button onClick={() => setIsEditOpen(true)} className="w-full p-3 rounded-xl bg-[#11151A] border border-[#1F2630] hover:border-[#343E4B] text-sm text-white flex items-center justify-between">
+                <span className="flex items-center gap-2"><RotateCcw className="w-4 h-4 text-[#FF6B1A]" /> Trocar sessão</span>
+                <ChevronRight className="w-4 h-4 text-[#707985]" />
+              </button>
+              <button onClick={duplicateSelectedDayToNext} className="w-full p-3 rounded-xl bg-[#11151A] border border-[#1F2630] hover:border-[#343E4B] text-sm text-white flex items-center justify-between">
+                <span className="flex items-center gap-2"><Copy className="w-4 h-4 text-[#FF6B1A]" /> Duplicar no próximo dia</span>
+                <ChevronRight className="w-4 h-4 text-[#707985]" />
+              </button>
+              <button onClick={() => setPreset('rest')} className="w-full p-3 rounded-xl bg-[#11151A] border border-[#1F2630] hover:border-amber-500/30 text-sm text-white flex items-center justify-between">
+                <span className="flex items-center gap-2"><Coffee className="w-4 h-4 text-amber-400" /> Marcar descanso</span>
+                <ChevronRight className="w-4 h-4 text-[#707985]" />
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-[#1F2630] bg-[#0D1014] p-5">
+            <span className="text-[10px] uppercase font-black tracking-wider text-[#707985]">Última atividade</span>
+            <div className="mt-3 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/20 flex items-center justify-center shrink-0">
+                <HeartPulse className="w-4 h-4 text-[#FF6B1A]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{workoutLogs[0]?.workoutTitle || 'Nenhum treino registrado'}</p>
+                {workoutLogs[0] && <p className="text-[11px] text-[#707985] mt-1">{workoutLogs[0].durationMinutes} min • {workoutLogs[0].exercisesCompleted} exercícios</p>}
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-3xl bg-[#0D1014] border border-[#1F2630] shadow-2xl">
+            <div className="sticky top-0 z-10 bg-[#0D1014]/95 backdrop-blur border-b border-[#1F2630] p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-black tracking-wider text-[#FF6B1A]">{currentDayData.dayName}</span>
+                <h3 className="text-xl font-heading text-white">Editar sessão</h3>
+              </div>
+              <button onClick={() => setIsEditOpen(false)} className="w-9 h-9 rounded-xl bg-[#15191F] border border-[#1F2630] text-[#9AA1AA] hover:text-white flex items-center justify-center" aria-label="Fechar edição">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-6">
+              <div>
+                <span className="text-[10px] uppercase font-black tracking-wider text-[#707985]">Tipo de sessão</span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+                  {(['pickup', 'game', 'gym', 'rest'] as SessionPreset[]).map((type) => {
+                    const meta = sessionMeta[type];
+                    const Icon = meta.icon;
+                    return (
+                      <button key={type} onClick={() => setPreset(type)} className="p-3 rounded-2xl bg-[#11151A] hover:bg-[#15191F] border border-[#1F2630] hover:border-[#FF6B1A]/30 text-left">
+                        <Icon className={`w-4 h-4 mb-2 ${type === 'rest' ? 'text-amber-400' : 'text-[#FF6B1A]'}`} />
+                        <span className="text-xs font-bold text-white block">{meta.label}</span>
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => currentDayData.workoutId ? setPreset('workout') : undefined} className="p-3 rounded-2xl bg-[#11151A] hover:bg-[#15191F] border border-[#1F2630] hover:border-[#FF6B1A]/30 text-left">
+                    <Flame className="w-4 h-4 mb-2 text-[#FF6B1A]" />
+                    <span className="text-xs font-bold text-white block">Treino técnico</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-[#707985]">Escolher treino técnico</span>
+                  <span className="text-[10px] text-[#707985]">{WORKOUTS_DATA.length} disponíveis</span>
+                </div>
+                <div className="space-y-2 mt-3">
+                  {WORKOUTS_DATA.map((workout) => (
+                    <button key={workout.id} onClick={() => handleSwapWorkout(workout)} className="w-full rounded-2xl bg-[#11151A] hover:bg-[#15191F] border border-[#1F2630] hover:border-[#FF6B1A]/35 p-3.5 flex items-center justify-between gap-3 text-left group">
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold text-white group-hover:text-[#FF8D4D] transition-colors block truncate">{workout.title}</span>
+                        <span className="text-[11px] text-[#707985]">{workout.estimatedMinutes} min • {workout.exercises.length} exercícios • {workout.level}</span>
+                      </div>
+                      <Plus className="w-4 h-4 text-[#FF6B1A] shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
