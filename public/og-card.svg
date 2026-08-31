@@ -1,0 +1,14 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#080A0D"/>
+  <circle cx="955" cy="150" r="94" fill="#FF6B1A"/>
+  <path d="M955 56V244M861 150H1049" stroke="#15191F" stroke-width="18" stroke-linecap="round"/>
+  <path d="M955 244C955 244 935 284 944 317" stroke="#FF6B1A" stroke-width="18" stroke-linecap="round"/>
+  <path d="M1060 235C1010 235 978 274 978 323L958 548H1136L1117 323C1117 274 1100 244 1060 235Z" fill="#050608" stroke="#FF6B1A" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M1030 235C1030 194 1062 163 1100 163C1142 163 1170 194 1170 235C1170 276 1142 306 1100 306" fill="#050608"/>
+  <path d="M1030 235C1030 194 1062 163 1100 163C1142 163 1170 194 1170 235C1170 276 1142 306 1100 306" stroke="#FF6B1A" stroke-width="16" stroke-linecap="round"/>
+  <text x="90" y="235" fill="#FF6B1A" font-family="Arial, sans-serif" font-weight="800" font-size="32" letter-spacing="8">COURT LAB</text>
+  <text x="90" y="330" fill="white" font-family="Arial, sans-serif" font-weight="900" font-size="72">DESENVOLVA</text>
+  <text x="90" y="408" fill="white" font-family="Arial, sans-serif" font-weight="900" font-size="72">SEU JOGO.</text>
+  <text x="90" y="475" fill="#9AA1AA" font-family="Arial, sans-serif" font-weight="600" font-size="28">Treine. Evolua. Leve para o jogo.</text>
+  <rect x="90" y="520" width="395" height="5" rx="2.5" fill="#FF6B1A"/>
+</svg>
