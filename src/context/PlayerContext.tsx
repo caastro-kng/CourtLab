@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   PlayerProfile,
   SkillRating,
@@ -12,6 +12,8 @@ import {
 } from '../types';
 import { WORKOUTS_DATA } from '../data/workouts';
 import { EXERCISES_DATA } from '../data/exercises';
+import { calculateTrainingStreaks, deriveSkillProgress, getTierFromXp, XP_REWARDS } from '../utils/progression';
+import { readNumberStorage, readStorage, writeStorage } from '../utils/storage';
 
 interface PlayerContextType {
   profile: PlayerProfile;
@@ -86,12 +88,12 @@ const INITIAL_SKILLS: SkillRating[] = [
 const INITIAL_WEEKLY_PLAN: DayPlan[] = [
   { dayOfWeek: 1, dayName: 'SEG', workoutId: 'wk-ball-handle-foundations', customTitle: 'Controle de Bola + Shooting', isRest: false, completed: true, completedAt: '2026-08-25' },
   { dayOfWeek: 2, dayName: 'TER', workoutId: 'wk-finishing-lab', customTitle: 'Finishing Lab', isRest: false, completed: true, completedAt: '2026-08-26' },
-  { dayOfWeek: 3, dayName: 'QUA', dayNameLabel: 'QUA', customTitle: 'Descanso Ativo', isRest: true, completed: true, completedAt: '2026-08-27' },
+  { dayOfWeek: 3, dayName: 'QUA', customTitle: 'Descanso Ativo', isRest: true, completed: true, completedAt: '2026-08-27' },
   { dayOfWeek: 4, dayName: 'QUI', workoutId: 'wk-shot-creator', customTitle: 'Shot Creation', isRest: false, completed: true, completedAt: '2026-08-28' },
   { dayOfWeek: 5, dayName: 'SEX', workoutId: 'wk-pnr-guard', customTitle: 'Pick and Roll Guard', isRest: false, completed: false },
   { dayOfWeek: 6, dayName: 'SÁB', workoutId: 'wk-perimeter-defense', customTitle: 'Defesa + Conditioning', isRest: false, completed: false },
   { dayOfWeek: 7, dayName: 'DOM', customTitle: 'Descanso e Recuperação', isRest: true, completed: false }
-] as any[];
+];
 
 const INITIAL_GOALS: Goal[] = [
   { id: 'g1', title: '500 arremessos esta semana', category: 'arremessos', targetValue: 500, currentValue: 340, unit: 'arremessos', completed: false, iconName: 'Target' },
@@ -145,108 +147,44 @@ const INITIAL_LOGS: WorkoutSessionLog[] = [
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<PlayerProfile>(() => {
-    const saved = localStorage.getItem('courtlab_profile');
-    return saved ? JSON.parse(saved) : INITIAL_PROFILE;
-  });
-
-  const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => {
-    const saved = localStorage.getItem('courtlab_skills');
-    return saved ? JSON.parse(saved) : INITIAL_SKILLS;
-  });
-
-  const [xp, setXp] = useState<number>(() => {
-    const saved = localStorage.getItem('courtlab_xp');
-    return saved ? Number(saved) : 1420;
-  });
-
-  const [currentStreakDays] = useState<number>(4);
-  const [longestStreakDays] = useState<number>(7);
-
-  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => {
-    const saved = localStorage.getItem('courtlab_weekly_plan');
-    return saved ? JSON.parse(saved) : INITIAL_WEEKLY_PLAN;
-  });
-
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    const saved = localStorage.getItem('courtlab_goals');
-    return saved ? JSON.parse(saved) : INITIAL_GOALS;
-  });
-
-  const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => {
-    const saved = localStorage.getItem('courtlab_logs');
-    return saved ? JSON.parse(saved) : INITIAL_LOGS;
-  });
-
-  const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => {
-    const saved = localStorage.getItem('courtlab_custom_workouts');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
+  const [profile, setProfile] = useState<PlayerProfile>(() => readStorage('courtlab_profile', INITIAL_PROFILE));
+  const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage('courtlab_skills', INITIAL_SKILLS));
+  const [xp, setXp] = useState<number>(() => readNumberStorage('courtlab_xp', 1420));
+  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN));
+  const [goals, setGoals] = useState<Goal[]>(() => readStorage('courtlab_goals', INITIAL_GOALS));
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => readStorage('courtlab_logs', INITIAL_LOGS));
+  const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => readStorage('courtlab_custom_workouts', []));
+  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(() => readStorage('courtlab_active_workout', null));
   const [isLoggedInDemo, setIsLoggedInDemo] = useState<boolean>(true);
 
-  // Persistence effects
-  useEffect(() => {
-    localStorage.setItem('courtlab_profile', JSON.stringify(profile));
-  }, [profile]);
+  useEffect(() => writeStorage('courtlab_profile', profile), [profile]);
+  useEffect(() => writeStorage('courtlab_skills', skillsRating), [skillsRating]);
+  useEffect(() => writeStorage('courtlab_xp', String(xp)), [xp]);
+  useEffect(() => writeStorage('courtlab_weekly_plan', weeklyPlan), [weeklyPlan]);
+  useEffect(() => writeStorage('courtlab_goals', goals), [goals]);
+  useEffect(() => writeStorage('courtlab_logs', workoutLogs), [workoutLogs]);
+  useEffect(() => writeStorage('courtlab_custom_workouts', customWorkouts), [customWorkouts]);
+  useEffect(() => writeStorage('courtlab_active_workout', activeWorkout), [activeWorkout]);
 
-  useEffect(() => {
-    localStorage.setItem('courtlab_skills', JSON.stringify(skillsRating));
-  }, [skillsRating]);
+  const tier = getTierFromXp(xp);
 
-  useEffect(() => {
-    localStorage.setItem('courtlab_xp', String(xp));
-  }, [xp]);
-
-  useEffect(() => {
-    localStorage.setItem('courtlab_weekly_plan', JSON.stringify(weeklyPlan));
-  }, [weeklyPlan]);
-
-  useEffect(() => {
-    localStorage.setItem('courtlab_goals', JSON.stringify(goals));
-  }, [goals]);
-
-  useEffect(() => {
-    localStorage.setItem('courtlab_logs', JSON.stringify(workoutLogs));
-  }, [workoutLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('courtlab_custom_workouts', JSON.stringify(customWorkouts));
-  }, [customWorkouts]);
-
-  // Derived Tier from XP
-  const getTier = (points: number): PlayerTier => {
-    if (points >= 3500) return 'Elite';
-    if (points >= 2500) return 'All-Star';
-    if (points >= 1800) return 'Sixth Man';
-    if (points >= 1200) return 'Starter';
-    if (points >= 600) return 'Prospect';
-    return 'Rookie';
-  };
-
-  const tier = getTier(xp);
-
-  // Identify top strength & lowest skill to develop
-  const sortedSkills = [...skillsRating].sort((a, b) => b.score - a.score);
+  const sortedSkills = useMemo(() => [...skillsRating].sort((a, b) => b.score - a.score), [skillsRating]);
   const topStrength = {
-    name: sortedSkills[0]?.name || 'Mudança de Ritmo',
-    score: sortedSkills[0]?.score || 8.2
+    name: sortedSkills[0]?.name || 'Sem avaliação',
+    score: sortedSkills[0]?.score || 0
   };
   const mainFocusArea = {
-    name: sortedSkills[sortedSkills.length - 1]?.name || 'Pick and Roll',
-    score: sortedSkills[sortedSkills.length - 1]?.score || 4.1
+    name: sortedSkills[sortedSkills.length - 1]?.name || 'Sem avaliação',
+    score: sortedSkills[sortedSkills.length - 1]?.score || 0
   };
 
-  // Skill progress breakdown across content
-  const skillProgressList: SkillProgressItem[] = [
-    { category: 'ball-handle', label: 'Controle de Bola', percentage: 62, completedDrillsCount: 15, totalDrillsCount: 24 },
-    { category: 'shooting', label: 'Arremesso', percentage: 48, completedDrillsCount: 12, totalDrillsCount: 25 },
-    { category: 'finishing', label: 'Finalização', percentage: 71, completedDrillsCount: 17, totalDrillsCount: 24 },
-    { category: 'passing', label: 'Passe', percentage: 53, completedDrillsCount: 8, totalDrillsCount: 15 },
-    { category: 'defense', label: 'Defesa', percentage: 37, completedDrillsCount: 6, totalDrillsCount: 16 },
-    { category: 'pick-and-roll', label: 'Pick and Roll', percentage: 41, completedDrillsCount: 7, totalDrillsCount: 17 }
-  ];
+  const streaks = useMemo(() => calculateTrainingStreaks(workoutLogs), [workoutLogs]);
+  const currentStreakDays = streaks.current;
+  const longestStreakDays = streaks.longest;
+  const skillProgressList = useMemo(
+    () => deriveSkillProgress(workoutLogs, customWorkouts),
+    [workoutLogs, customWorkouts]
+  );
 
   const updateProfile = (updated: Partial<PlayerProfile>) => {
     setProfile((prev) => ({ ...prev, ...updated }));
@@ -254,12 +192,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateSkillRating = (key: string, newScore: number) => {
     setSkillsRating((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, score: Math.max(0, Math.min(10, Number(newScore.toFixed(1)))) } : s))
+      prev.map((skill) =>
+        skill.key === key
+          ? { ...skill, score: Math.max(0, Math.min(10, Number(newScore.toFixed(1)))) }
+          : skill
+      )
     );
   };
 
   const addXp = (amount: number) => {
-    setXp((prev) => prev + amount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setXp((prev) => prev + Math.round(amount));
   };
 
   const updateDayPlan = (dayOfWeek: number, updates: Partial<DayPlan>) => {
@@ -271,77 +214,77 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const addGoal = (goalData: Omit<Goal, 'id' | 'completed'>) => {
     const newGoal: Goal = {
       ...goalData,
-      id: 'goal-' + Date.now(),
+      id: `goal-${Date.now()}`,
       completed: goalData.currentValue >= goalData.targetValue
     };
     setGoals((prev) => [newGoal, ...prev]);
-    addXp(25);
+    addXp(XP_REWARDS.createGoal);
   };
 
   const updateGoalProgress = (id: string, delta: number) => {
     setGoals((prev) =>
-      prev.map((g) => {
-        if (g.id === id) {
-          const newVal = Math.max(0, g.currentValue + delta);
-          const wasCompleted = g.completed;
-          const isNowCompleted = newVal >= g.targetValue;
-          if (!wasCompleted && isNowCompleted) {
-            addXp(50);
-          }
-          return { ...g, currentValue: newVal, completed: isNowCompleted };
-        }
-        return g;
+      prev.map((goal) => {
+        if (goal.id !== id) return goal;
+        const newValue = Math.max(0, goal.currentValue + delta);
+        const isNowCompleted = newValue >= goal.targetValue;
+        if (!goal.completed && isNowCompleted) addXp(XP_REWARDS.completeGoal);
+        return { ...goal, currentValue: newValue, completed: isNowCompleted };
       })
     );
   };
 
   const completeWorkoutSession = (logData: Omit<WorkoutSessionLog, 'id' | 'completedAt'>) => {
+    const completedAt = new Date().toISOString();
     const newLog: WorkoutSessionLog = {
       ...logData,
-      id: 'log-' + Date.now(),
-      completedAt: new Date().toISOString()
+      id: `log-${Date.now()}`,
+      completedAt
     };
+
     setWorkoutLogs((prev) => [newLog, ...prev]);
-    addXp(logData.xpEarned || 120);
+    addXp(logData.xpEarned || XP_REWARDS.fallbackWorkoutCompletion);
 
-    // Update goals
-    updateGoalProgress('g2', 1);
-    if (logData.shotsMade) {
-      updateGoalProgress('g1', logData.shotsMade);
-    }
-  };
+    setWeeklyPlan((prev) =>
+      prev.map((day) =>
+        day.workoutId === logData.workoutId
+          ? { ...day, completed: true, completedAt }
+          : day
+      )
+    );
 
-  const saveCustomWorkout = (workout: Workout) => {
-    setCustomWorkouts((prev) => [workout, ...prev]);
-    addXp(50);
-  };
+    setGoals((prev) =>
+      prev.map((goal) => {
+        if (goal.completed) return goal;
+        let delta = 0;
+        if (goal.category === 'treinos') delta = 1;
+        if (goal.category === 'tempo') delta = logData.durationMinutes || 0;
+        if (goal.category === 'arremessos') delta = logData.shotsMade || 0;
+        if (goal.category === 'repeticoes') delta = logData.totalReps || 0;
+        if (!delta) return goal;
 
-  const startWorkout = (workout: Workout) => {
-    setActiveWorkout(workout);
-  };
-
-  const finishActiveWorkout = () => {
-    setActiveWorkout(null);
-  };
-
-  const cancelActiveWorkout = () => {
-    setActiveWorkout(null);
-  };
-
-  const getExerciseById = (id: string): Exercise | undefined => {
-    return EXERCISES_DATA.find((e) => e.id === id);
-  };
-
-  const getWorkoutById = (id: string): Workout | undefined => {
-    return (
-      WORKOUTS_DATA.find((w) => w.id === id) ||
-      customWorkouts.find((w) => w.id === id)
+        const newValue = Math.min(goal.targetValue, Math.max(0, goal.currentValue + delta));
+        const isNowCompleted = newValue >= goal.targetValue;
+        if (!goal.completed && isNowCompleted) addXp(XP_REWARDS.completeGoal);
+        return { ...goal, currentValue: newValue, completed: isNowCompleted };
+      })
     );
   };
 
-  const loginAsDemo = () => {
-    setIsLoggedInDemo(true);
+  const saveCustomWorkout = (workout: Workout) => {
+    setCustomWorkouts((prev) => [workout, ...prev.filter((item) => item.id !== workout.id)]);
+    addXp(XP_REWARDS.createCustomWorkout);
   };
+
+  const startWorkout = (workout: Workout) => setActiveWorkout(workout);
+  const finishActiveWorkout = () => setActiveWorkout(null);
+  const cancelActiveWorkout = () => setActiveWorkout(null);
+
+  const getExerciseById = (id: string): Exercise | undefined => EXERCISES_DATA.find((exercise) => exercise.id === id);
+
+  const getWorkoutById = (id: string): Workout | undefined =>
+    WORKOUTS_DATA.find((workout) => workout.id === id) || customWorkouts.find((workout) => workout.id === id);
+
+  const loginAsDemo = () => setIsLoggedInDemo(true);
 
   return (
     <PlayerContext.Provider
@@ -384,8 +327,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 export const usePlayer = () => {
   const context = useContext(PlayerContext);
-  if (!context) {
-    throw new Error('usePlayer must be used within a PlayerProvider');
-  }
+  if (!context) throw new Error('usePlayer must be used within a PlayerProvider');
   return context;
 };
