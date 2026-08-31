@@ -1,260 +1,322 @@
-import React, { useState, useMemo } from 'react';
-import { useSearchParams, useOutletContext } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  Filter,
   X,
   Target,
   SlidersHorizontal,
   Dumbbell,
-  Sparkles,
-  MapPin
+  MapPin,
+  Clock3,
+  WandSparkles,
+  CircleDot,
+  House,
+  Trophy
 } from 'lucide-react';
 import { EXERCISES_DATA } from '../data/exercises';
 import { ExerciseCard } from '../components/common/ExerciseCard';
 import { Exercise } from '../types';
 
-export const Library: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialCategory = searchParams.get('category') || 'all';
+const CATEGORY_OPTIONS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'ball-handle', label: 'Ball Handle' },
+  { id: 'shooting', label: 'Arremesso' },
+  { id: 'finishing', label: 'Finalização' },
+  { id: 'footwork', label: 'Footwork' },
+  { id: 'passing', label: 'Passe' },
+  { id: 'pick-and-roll', label: 'Pick and Roll' },
+  { id: 'defense', label: 'Defesa' },
+  { id: 'off-ball', label: 'Sem Bola' },
+  { id: 'athletic', label: 'Físico' }
+];
 
+const QUICK_CONTEXTS = [
+  { id: 'one-ball', label: 'Só 1 bola', icon: CircleDot },
+  { id: 'small-space', label: 'Pouco espaço', icon: House },
+  { id: 'half-court', label: 'Meia quadra', icon: MapPin },
+  { id: 'no-equipment', label: 'Sem equipamento', icon: Dumbbell }
+] as const;
+
+const TIME_OPTIONS = [0, 10, 15, 20, 30];
+
+export const Library: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const initialCategory = searchParams.get('category') || 'all';
   const { onSelectExercise } = useOutletContext<{ onSelectExercise: (e: Exercise) => void }>();
 
-  // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [selectedSpace, setSelectedSpace] = useState<string>('all');
-  const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
+  const [selectedSpace, setSelectedSpace] = useState('all');
+  const [selectedEquipment, setSelectedEquipment] = useState('all');
+  const [selectedTime, setSelectedTime] = useState(0);
+  const [quickContext, setQuickContext] = useState<string | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  const categories = [
-    { id: 'all', label: 'Todos os Fundamentos' },
-    { id: 'ball-handle', label: 'Controle de Bola' },
-    { id: 'shooting', label: 'Arremesso' },
-    { id: 'finishing', label: 'Finalização' },
-    { id: 'footwork', label: 'Footwork' },
-    { id: 'passing', label: 'Passe' },
-    { id: 'pick-and-roll', label: 'Pick and Roll' },
-    { id: 'defense', label: 'Defesa' },
-    { id: 'athletic', label: 'Físico / Pliometria' }
-  ];
-
-  const difficulties = ['all', 'Iniciante', 'Intermediário', 'Avançado', 'Competitivo'];
-  const spaces = ['all', 'Meia quadra', 'Garrafão', 'Espaço reduzido', 'Quadra inteira', 'Parede'];
-  const equipments = ['all', '1 Bola', '2 Bolas', 'Cones', 'Tabela', 'Bola de tênis'];
-
-  // Filter Logic
   const filteredExercises = useMemo(() => {
     return EXERCISES_DATA.filter((exercise) => {
-      // Search match
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesQuery =
-          exercise.name.toLowerCase().includes(q) ||
-          exercise.subcategory.toLowerCase().includes(q) ||
-          exercise.description.toLowerCase().includes(q) ||
-          exercise.categoryLabel.toLowerCase().includes(q);
-        if (!matchesQuery) return false;
+        const searchable = [
+          exercise.name,
+          exercise.subcategory,
+          exercise.description,
+          exercise.categoryLabel,
+          exercise.gameTransfer.skill,
+          exercise.gameTransfer.gameSituation,
+          exercise.gameTransfer.objective,
+          ...exercise.equipment
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!searchable.includes(q)) return false;
       }
 
-      // Category match
-      if (selectedCategory !== 'all' && exercise.category !== selectedCategory) {
-        return false;
-      }
+      if (selectedCategory !== 'all' && exercise.category !== selectedCategory) return false;
+      if (selectedDifficulty !== 'all' && exercise.difficulty !== selectedDifficulty) return false;
+      if (selectedSpace !== 'all' && exercise.space !== selectedSpace) return false;
+      if (selectedTime > 0 && exercise.durationMinutes > selectedTime) return false;
 
-      // Difficulty match
-      if (selectedDifficulty !== 'all' && exercise.difficulty !== selectedDifficulty) {
-        return false;
-      }
-
-      // Space match
-      if (selectedSpace !== 'all' && !exercise.space.toLowerCase().includes(selectedSpace.toLowerCase())) {
-        return false;
-      }
-
-      // Equipment match
       if (selectedEquipment !== 'all') {
-        const hasEquip = exercise.equipment.some((eq) =>
-          eq.toLowerCase().includes(selectedEquipment.toLowerCase().replace('1 bola', 'bola'))
-        );
-        if (!hasEquip) return false;
+        const equipmentMatch = exercise.equipment.some((item) => item.toLowerCase() === selectedEquipment.toLowerCase());
+        if (!equipmentMatch) return false;
       }
+
+      if (quickContext === 'one-ball') {
+        const allowed = exercise.equipment.every((item) => ['1 bola', 'Sem equipamento'].includes(item));
+        if (!allowed) return false;
+      }
+      if (quickContext === 'small-space' && !['Casa', 'Área pequena'].includes(exercise.space)) return false;
+      if (quickContext === 'half-court' && exercise.space !== 'Meia quadra') return false;
+      if (quickContext === 'no-equipment' && !exercise.equipment.includes('Sem equipamento')) return false;
 
       return true;
     });
-  }, [searchQuery, selectedCategory, selectedDifficulty, selectedSpace, selectedEquipment]);
+  }, [searchQuery, selectedCategory, selectedDifficulty, selectedSpace, selectedEquipment, selectedTime, quickContext]);
 
-  const activeFiltersCount =
-    (selectedCategory !== 'all' ? 1 : 0) +
-    (selectedDifficulty !== 'all' ? 1 : 0) +
-    (selectedSpace !== 'all' ? 1 : 0) +
-    (selectedEquipment !== 'all' ? 1 : 0) +
-    (searchQuery.trim() ? 1 : 0);
+  const activeFiltersCount = [
+    selectedCategory !== 'all',
+    selectedDifficulty !== 'all',
+    selectedSpace !== 'all',
+    selectedEquipment !== 'all',
+    selectedTime > 0,
+    !!quickContext,
+    !!searchQuery.trim()
+  ].filter(Boolean).length;
 
-  const handleClearFilters = () => {
+  const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('all');
     setSelectedDifficulty('all');
     setSelectedSpace('all');
     setSelectedEquipment('all');
+    setSelectedTime(0);
+    setQuickContext(null);
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div>
-        <span className="text-[10px] uppercase font-mono-num font-bold tracking-widest text-[#FF6B1A] block mb-1">
-          Base de Conhecimento Técnico
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-heading text-white tracking-tight leading-tight">
-          BIBLIOTECA DE EXERCÍCIOS
-        </h1>
-        <p className="text-xs sm:text-sm text-[#9AA1AA] mt-1 max-w-2xl">
-          Mais de 30 exercícios profissionais detalhados com biomecânica, pontos-chave, erros comuns e aplicação tática direta (DRILL → SKILL → GAME).
-        </p>
-      </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-7 animate-in fade-in duration-300">
+      <section className="relative overflow-hidden rounded-3xl border border-[#1F2630] bg-[#0D1014] p-5 sm:p-7">
+        <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-[#FF6B1A]/10 blur-3xl" />
+        <div className="relative z-10 max-w-3xl">
+          <span className="text-[10px] uppercase font-mono-num font-bold tracking-[0.2em] text-[#FF6B1A] block mb-2">
+            Skill Development Library
+          </span>
+          <h1 className="text-3xl sm:text-5xl font-heading text-white tracking-tight leading-none">
+            O QUE VOCÊ CONSEGUE TREINAR AGORA?
+          </h1>
+          <p className="text-sm text-[#9AA1AA] mt-3 max-w-2xl leading-relaxed">
+            Encontre exercícios pelo que você quer desenvolver, pelo espaço que tem e pelo equipamento disponível. Cada exercício conecta <strong className="text-white">DRILL → SKILL → GAME</strong>.
+          </p>
+        </div>
+      </section>
 
-      {/* Filter Control Center */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1014] border border-[#1F2630] space-y-4 shadow-xl">
-        {/* Search Bar & Clear Button */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
+      <section className="space-y-4">
+        <div>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA]">Estou na quadra agora</span>
+          <h2 className="text-xl font-heading text-white">Filtrar pelo meu contexto</h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {QUICK_CONTEXTS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setQuickContext((current) => (current === id ? null : id))}
+              className={`p-4 rounded-2xl border text-left transition-all ${
+                quickContext === id
+                  ? 'bg-[#FF6B1A]/12 border-[#FF6B1A] shadow-lg shadow-[#FF6B1A]/10'
+                  : 'bg-[#11151A] border-[#1F2630] hover:border-[#394452]'
+              }`}
+            >
+              <Icon className={`w-5 h-5 mb-3 ${quickContext === id ? 'text-[#FF6B1A]' : 'text-[#9AA1AA]'}`} />
+              <span className="text-sm font-bold text-white block">{label}</span>
+              <span className="text-[11px] text-[#9AA1AA] mt-1 block">
+                {id === 'one-ball' && 'Exercícios que exigem no máximo uma bola'}
+                {id === 'small-space' && 'Casa, garagem ou área reduzida'}
+                {id === 'half-court' && 'Treinos que cabem em meia quadra'}
+                {id === 'no-equipment' && 'Movimentos sem material adicional'}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl bg-[#0D1014] border border-[#1F2630] p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#FF6B1A] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
-              type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome, subcategoria ou fundamento (ex: Crossover, Floater, PnR)..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs sm:text-sm text-white placeholder-[#9AA1AA] focus:outline-none focus:border-[#FF6B1A]"
+              placeholder="Buscar Crossover, Floater, weak hand, closeout, PnR..."
+              className="w-full pl-10 pr-10 py-3.5 rounded-xl bg-[#15191F] border border-[#1F2630] text-sm text-white placeholder:text-[#737A84] focus:outline-none focus:border-[#FF6B1A]"
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-[#9AA1AA] hover:text-white"
-              >
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#9AA1AA] hover:text-white" aria-label="Limpar busca">
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-
+          <button
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+            className={`px-4 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${
+              showAdvancedFilters ? 'bg-[#FF6B1A]/10 border-[#FF6B1A] text-white' : 'bg-[#15191F] border-[#1F2630] text-[#9AA1AA] hover:text-white'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Mais filtros
+          </button>
           {activeFiltersCount > 0 && (
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-3 rounded-xl bg-[#191E24] hover:bg-[#202730] text-xs font-bold uppercase tracking-wider text-white border border-[#2B3542] transition-colors flex items-center gap-1.5 whitespace-nowrap self-stretch sm:self-auto justify-center"
-            >
-              <X className="w-3.5 h-3.5 text-red-400" />
-              Limpar Filtros ({activeFiltersCount})
+            <button onClick={clearFilters} className="px-4 py-3 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs font-bold text-white hover:border-red-400/50 flex items-center justify-center gap-2">
+              <X className="w-4 h-4 text-red-400" />
+              Limpar ({activeFiltersCount})
             </button>
           )}
         </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {categories.map((cat) => (
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {CATEGORY_OPTIONS.map((category) => (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider whitespace-nowrap transition-colors border ${
-                selectedCategory === cat.id
-                  ? 'bg-[#FF6B1A] text-white border-[#FF6B1A] shadow-md shadow-[#FF6B1A]/20'
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap border transition-colors ${
+                selectedCategory === category.id
+                  ? 'bg-[#FF6B1A] border-[#FF6B1A] text-white'
                   : 'bg-[#15191F] border-[#1F2630] text-[#9AA1AA] hover:text-white'
               }`}
             >
-              {cat.label}
+              {category.label}
             </button>
           ))}
         </div>
 
-        {/* Secondary Select Dropdowns (Difficulty, Space, Equipment) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#1F2630]">
-          <div>
-            <label className="text-[10px] uppercase font-bold text-[#9AA1AA] block mb-1">
-              Dificuldade
-            </label>
-            <select
-              value={selectedDifficulty}
-              onChange={(e) => setSelectedDifficulty(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]"
-            >
-              <option value="all">Todas as Dificuldades</option>
-              <option value="Iniciante">Iniciante</option>
-              <option value="Intermediário">Intermediário</option>
-              <option value="Avançado">Avançado</option>
-              <option value="Competitivo">Competitivo</option>
-            </select>
+        <div className="pt-3 border-t border-[#1F2630]">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock3 className="w-4 h-4 text-[#FF6B1A]" />
+            <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Quanto tempo tenho?</span>
           </div>
-
-          <div>
-            <label className="text-[10px] uppercase font-bold text-[#9AA1AA] block mb-1">
-              Espaço Disponível
-            </label>
-            <select
-              value={selectedSpace}
-              onChange={(e) => setSelectedSpace(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]"
-            >
-              <option value="all">Qualquer Espaço</option>
-              <option value="Meia quadra">Meia Quadra</option>
-              <option value="Garrafão">Garrafão</option>
-              <option value="Espaço reduzido">Espaço Reduzido (Garagem/Quarto)</option>
-              <option value="Quadra inteira">Quadra Inteira</option>
-              <option value="Parede">Parede de Rebote</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] uppercase font-bold text-[#9AA1AA] block mb-1">
-              Equipamento
-            </label>
-            <select
-              value={selectedEquipment}
-              onChange={(e) => setSelectedEquipment(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]"
-            >
-              <option value="all">Qualquer Equipamento</option>
-              <option value="1 Bola">1 Bola de Basquete</option>
-              <option value="2 Bolas">2 Bolas Simultâneas</option>
-              <option value="Cones">Com Cones</option>
-              <option value="Tabela">Com Tabela / Aro</option>
-              <option value="Bola de tênis">Bola de Tênis</option>
-            </select>
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {TIME_OPTIONS.map((minutes) => (
+              <button
+                key={minutes}
+                onClick={() => setSelectedTime(minutes)}
+                className={`min-w-[64px] px-3 py-2 rounded-xl border text-xs font-mono-num font-bold transition-colors ${
+                  selectedTime === minutes ? 'bg-white text-black border-white' : 'bg-[#15191F] border-[#1F2630] text-[#9AA1AA] hover:text-white'
+                }`}
+              >
+                {minutes === 0 ? 'QUALQUER' : `≤ ${minutes} MIN`}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-mono-num text-[#9AA1AA]">
-          Mostrando <strong className="text-white font-bold">{filteredExercises.length}</strong> exercícios
-        </span>
-      </div>
+        {showAdvancedFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-[#1F2630] animate-in fade-in duration-200">
+            <label className="space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Nível</span>
+              <select value={selectedDifficulty} onChange={(e) => setSelectedDifficulty(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]">
+                <option value="all">Todos os níveis</option>
+                <option value="Iniciante">Iniciante</option>
+                <option value="Intermediário">Intermediário</option>
+                <option value="Avançado">Avançado</option>
+                <option value="Competitivo">Competitivo</option>
+              </select>
+            </label>
 
-      {/* Exercises Grid */}
+            <label className="space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Espaço</span>
+              <select value={selectedSpace} onChange={(e) => setSelectedSpace(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]">
+                <option value="all">Qualquer espaço</option>
+                <option value="Casa">Casa</option>
+                <option value="Área pequena">Área pequena</option>
+                <option value="Meia quadra">Meia quadra</option>
+                <option value="Quadra inteira">Quadra inteira</option>
+                <option value="Academia">Academia</option>
+              </select>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Equipamento</span>
+              <select value={selectedEquipment} onChange={(e) => setSelectedEquipment(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-[#15191F] border border-[#1F2630] text-xs text-white focus:outline-none focus:border-[#FF6B1A]">
+                <option value="all">Qualquer equipamento</option>
+                <option value="Sem equipamento">Sem equipamento</option>
+                <option value="1 bola">1 bola</option>
+                <option value="2 bolas">2 bolas</option>
+                <option value="Cones">Cones</option>
+                <option value="Cadeira">Cadeira</option>
+                <option value="Parede">Parede</option>
+                <option value="Elástico">Elástico</option>
+                <option value="Bola de tênis">Bola de tênis</option>
+                <option value="Parceiro">Parceiro</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA]">Resultados</span>
+          <h2 className="text-xl sm:text-2xl font-heading text-white">
+            {filteredExercises.length} {filteredExercises.length === 1 ? 'exercício encontrado' : 'exercícios encontrados'}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-[#9AA1AA]">
+          <WandSparkles className="w-4 h-4 text-[#FF6B1A]" />
+          Abra um exercício para ver execução e aplicação no jogo
+        </div>
+      </section>
+
       {filteredExercises.length === 0 ? (
-        <div className="p-12 text-center border-2 border-dashed border-[#1F2630] rounded-3xl space-y-3 bg-[#0D1014]">
-          <Target className="w-10 h-10 text-[#FF6B1A] mx-auto opacity-50" />
-          <h3 className="text-lg font-heading text-white">Nenhum exercício encontrado</h3>
-          <p className="text-xs text-[#9AA1AA] max-w-sm mx-auto">
-            Tente ajustar os filtros de busca ou limpar as seleções para ver mais resultados.
+        <section className="p-10 text-center border-2 border-dashed border-[#1F2630] rounded-3xl bg-[#0D1014]">
+          <Target className="w-10 h-10 text-[#FF6B1A] mx-auto mb-3" />
+          <h3 className="text-xl font-heading text-white">Nenhum exercício cabe nesses filtros</h3>
+          <p className="text-sm text-[#9AA1AA] max-w-md mx-auto mt-2">
+            Remova um filtro de espaço, tempo ou equipamento para ampliar as opções disponíveis.
           </p>
-          <button
-            onClick={handleClearFilters}
-            className="px-4 py-2 rounded-xl bg-[#FF6B1A] text-white text-xs font-bold uppercase tracking-wider"
-          >
-            Resetar Filtros
+          <button onClick={clearFilters} className="mt-5 px-5 py-2.5 rounded-xl bg-[#FF6B1A] text-white text-xs font-bold uppercase tracking-wider">
+            Mostrar toda a biblioteca
           </button>
-        </div>
+        </section>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredExercises.map((exercise) => (
-            <ExerciseCard
-              key={exercise.id}
-              exercise={exercise}
-              onSelect={onSelectExercise}
-            />
+            <ExerciseCard key={exercise.id} exercise={exercise} onSelect={onSelectExercise} />
           ))}
         </div>
       )}
+
+      <section className="rounded-3xl border border-[#1F2630] bg-[#11151A] p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#FF6B1A]/10 text-[#FF6B1A] flex items-center justify-center flex-shrink-0">
+            <Trophy className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">Método CourtLab</span>
+            <h3 className="text-lg font-heading text-white">Não colecione drills. Desenvolva habilidades que aparecem no jogo.</h3>
+            <p className="text-xs text-[#9AA1AA] mt-1">Cada exercício explica o movimento, a habilidade treinada e a situação em que ela deve ser aplicada.</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
