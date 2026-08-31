@@ -1,28 +1,40 @@
-import React from 'react';
-import { useOutletContext, useNavigate, Link } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Flame,
+  ArrowRight,
+  Award,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronRight,
   Clock,
   Dumbbell,
+  Flame,
+  Play,
+  Sparkles,
   Target,
-  Award,
-  ArrowRight,
-  CheckCircle2,
-  Calendar,
-  Activity,
-  Shield,
-  Layers,
-  ChevronRight,
+  TimerReset,
   TrendingUp,
-  Sparkles
+  Zap
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { WORKOUTS_DATA } from '../data/workouts';
 import { FUNDAMENTALS_DATA } from '../data/fundamentals';
 import { WorkoutCard } from '../components/common/WorkoutCard';
-import { ExerciseCard } from '../components/common/ExerciseCard';
 import { RadarSkillChart } from '../components/common/RadarSkillChart';
-import { Exercise, Workout } from '../types';
+
+const normalize = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const formatMinutes = (minutes: number) => {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}min` : `${hours}h`;
+};
 
 export const Dashboard: React.FC = () => {
   const {
@@ -39,395 +51,366 @@ export const Dashboard: React.FC = () => {
     startWorkout
   } = usePlayer();
 
-  const { onSelectExercise } = useOutletContext<{ onSelectExercise: (e: Exercise) => void }>();
   const navigate = useNavigate();
+  const today = new Date();
+  const todayDayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+  const todayPlan = weeklyPlan.find((day) => day.dayOfWeek === todayDayOfWeek);
+  const todayWorkout =
+    WORKOUTS_DATA.find((workout) => workout.id === todayPlan?.workoutId) || WORKOUTS_DATA[0];
 
-  // Today's featured workout (Shot Creation or Ball Handle)
-  const todayWorkout = WORKOUTS_DATA[0]; // Shot Creation
+  const recentStats = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - 6);
 
-  // Recommended workouts based on profile goals
-  const recommendedWorkouts = WORKOUTS_DATA.slice(1, 4);
+    const recentLogs = workoutLogs.filter((log) => new Date(log.completedAt) >= cutoff);
+    return {
+      workouts: recentLogs.length,
+      minutes: recentLogs.reduce((sum, log) => sum + (log.durationMinutes || 0), 0),
+      exercises: recentLogs.reduce((sum, log) => sum + (log.exercisesCompleted || 0), 0),
+      shots: recentLogs.reduce((sum, log) => sum + (log.shotsMade || 0), 0)
+    };
+  }, [workoutLogs]);
+
+  const weeklyTarget = weeklyPlan.filter((day) => !day.isRest).length;
+  const weeklyCompleted = weeklyPlan.filter((day) => !day.isRest && day.completed).length;
+  const weeklyPercent = weeklyTarget ? Math.min(100, Math.round((weeklyCompleted / weeklyTarget) * 100)) : 0;
+
+  const recommendedWorkouts = useMemo(() => {
+    const focus = normalize(mainFocusArea.name);
+    const directMatches = WORKOUTS_DATA.filter((workout) => {
+      const haystack = normalize(`${workout.title} ${workout.categoryLabel} ${workout.description}`);
+      const focusWords = focus.split(' ').filter((word) => word.length > 2);
+      return focusWords.some((word) => haystack.includes(word));
+    });
+
+    const unique = [...directMatches, ...WORKOUTS_DATA.filter((workout) => workout.id !== todayWorkout.id)];
+    return Array.from(new Map(unique.map((workout) => [workout.id, workout])).values()).slice(0, 2);
+  }, [mainFocusArea.name, todayWorkout.id]);
+
+  const activeGoals = goals.slice(0, 3);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* 1. Welcome & Player Overview Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono-num font-bold uppercase tracking-wider text-[#FF8D4D] mb-1">
-            <span>Temporada 2026</span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-emerald-400">
-              <Sparkles className="w-3.5 h-3.5" />
-              Plano Ativo
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-7 sm:space-y-8 animate-in fade-in duration-300">
+      <section className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-2 mb-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-[#FF8D4D]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Plano ativo
             </span>
+            <span className="text-[#4E5865]">/</span>
+            <span className="text-[#7F8995]">Temporada 2026</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-heading text-white tracking-tight leading-none">
-            E aí, <span className="text-[#FF6B1A]">{profile.name}</span>! Bora pra quadra?
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading tracking-tight text-white leading-[0.95]">
+            Bora evoluir hoje, <span className="text-[#FF6B1A]">{profile.name}</span>?
           </h1>
-          <p className="text-xs sm:text-sm text-[#9AA1AA] mt-1">
-            Posição: <strong className="text-white">{profile.position}</strong> • Foco principal:{' '}
-            <strong className="text-white">{mainFocusArea.name}</strong>
+          <p className="mt-3 text-sm text-[#8F98A4] max-w-2xl leading-relaxed">
+            Seu foco atual é <strong className="text-white font-semibold">{mainFocusArea.name}</strong>. O CourtLab organiza o treino para você praticar, aplicar e acompanhar a evolução na quadra.
           </p>
         </div>
 
-        {/* Quick Summary Pill Bar */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <div className="px-3.5 py-2 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center gap-2.5">
-            <Flame className="w-5 h-5 text-[#FF6B1A] fill-[#FF6B1A]" />
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block leading-tight">Sequência</span>
-              <span className="text-sm font-mono-num font-bold text-white leading-none">{currentStreakDays} Dias Seguidos</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-[#242B34] bg-[#10141A] px-3 py-2">
+            <Flame className="w-4 h-4 text-[#FF6B1A] fill-[#FF6B1A]" />
+            <div className="leading-tight">
+              <span className="block text-[9px] uppercase tracking-wider font-bold text-[#727C88]">Sequência</span>
+              <span className="text-sm font-bold text-white">{currentStreakDays} dias</span>
             </div>
           </div>
-
-          <div className="px-3.5 py-2 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center gap-2.5">
-            <Award className="w-5 h-5 text-[#FF8D4D]" />
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block leading-tight">Nível</span>
-              <span className="text-sm font-heading text-[#FF6B1A] leading-none">{tier} ({xp} XP)</span>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-[#242B34] bg-[#10141A] px-3 py-2">
+            <Award className="w-4 h-4 text-[#FF8D4D]" />
+            <div className="leading-tight">
+              <span className="block text-[9px] uppercase tracking-wider font-bold text-[#727C88]">{tier}</span>
+              <span className="text-sm font-bold text-white">{xp} XP</span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 2. Hero Card: "TREINO DE HOJE" (Section 22) */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-[#191E24] via-[#15191F] to-[#0D1014] border border-[#FF6B1A]/40 shadow-2xl shadow-[#FF6B1A]/10">
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-25 hidden md:block overflow-hidden">
+      <section className="relative overflow-hidden rounded-[28px] border border-[#FF6B1A]/35 bg-[#0E1217] min-h-[330px] sm:min-h-[360px]">
+        <div className="absolute inset-0">
           <img
             src={todayWorkout.thumbnail}
-            alt={todayWorkout.title}
-            className="w-full h-full object-cover mix-blend-luminosity filter contrast-125"
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover opacity-35 grayscale"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#15191F] via-[#15191F]/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0B0E12] via-[#0B0E12]/95 to-[#0B0E12]/45" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E12] via-transparent to-transparent" />
         </div>
 
-        <div className="relative z-10 p-6 sm:p-8 md:max-w-2xl flex flex-col justify-between space-y-6">
+        <div className="relative z-10 h-full p-6 sm:p-8 lg:p-10 flex flex-col justify-between gap-10 max-w-3xl">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#FF6B1A] text-white">
-                Treino de Hoje
+            <div className="flex items-center gap-2 flex-wrap mb-5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF6B1A] text-white text-[10px] font-bold uppercase tracking-wider">
+                <Play className="w-3 h-3 fill-current" />
+                Treino de hoje
               </span>
-              <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase bg-black/50 text-[#9AA1AA] border border-white/10">
+              <span className="px-3 py-1.5 rounded-full border border-white/10 bg-black/30 text-[10px] font-bold uppercase tracking-wider text-white/75">
                 {todayWorkout.categoryLabel}
               </span>
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono-num font-bold text-[#FF8D4D] bg-[#FF6B1A]/10 border border-[#FF6B1A]/30">
-                +{todayWorkout.xpReward} XP
-              </span>
+              {todayPlan?.isRest && (
+                <span className="px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                  Dia de recuperação
+                </span>
+              )}
             </div>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-heading text-white tracking-tight leading-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-heading tracking-tight leading-[0.92] text-white max-w-2xl">
               {todayWorkout.title}
             </h2>
-
-            <p className="text-xs sm:text-sm text-[#9AA1AA] mt-2 leading-relaxed">
+            <p className="mt-4 text-sm sm:text-base leading-relaxed text-[#A3ABB5] max-w-xl">
               {todayWorkout.description}
             </p>
 
-            {/* Quick drill preview badges */}
-            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-white/90">
-              <span className="flex items-center gap-1.5 font-mono-num">
-                <Clock className="w-4 h-4 text-[#FF6B1A]" />
-                {todayWorkout.estimatedMinutes} minutos
-              </span>
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Dumbbell className="w-4 h-4 text-[#FF6B1A]" />
-                {todayWorkout.exercises.length} exercícios
-              </span>
-              <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
-                <Target className="w-4 h-4" />
-                Nível {todayWorkout.level}
-              </span>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 mt-6 text-xs sm:text-sm text-white/85">
+              <span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#FF6B1A]" />{todayWorkout.estimatedMinutes} min</span>
+              <span className="inline-flex items-center gap-2"><Dumbbell className="w-4 h-4 text-[#FF6B1A]" />{todayWorkout.exercises.length} exercícios</span>
+              <span className="inline-flex items-center gap-2"><Target className="w-4 h-4 text-[#FF6B1A]" />{todayWorkout.level}</span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => startWorkout(todayWorkout)}
-              className="py-3.5 px-8 rounded-2xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white font-heading text-base uppercase tracking-wider transition-all shadow-lg shadow-[#FF6B1A]/30 flex items-center justify-center gap-2 group"
+              className="min-h-12 px-6 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white font-bold text-sm transition-colors inline-flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B1A]/20"
             >
-              <Flame className="w-5 h-5 fill-current" />
-              <span>Começar Treino</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <Play className="w-4 h-4 fill-current" />
+              Começar treino
+              <ArrowRight className="w-4 h-4" />
             </button>
-
             <button
-              onClick={() => navigate('/plano')}
-              className="py-3.5 px-5 rounded-2xl bg-[#15191F] hover:bg-[#1E242D] border border-[#2B3542] text-xs font-bold uppercase tracking-wider text-white transition-colors text-center"
+              onClick={() => navigate('/treinar')}
+              className="min-h-12 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-sm transition-colors"
             >
-              Ver Cronograma
+              Escolher outro treino
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 3. Weekly Streak Strip & Weekly Summary Grid (Sections 23 & 24) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly Calendar Strip (SEG - DOM) */}
-        <div className="lg:col-span-2 p-5 sm:p-6 rounded-3xl bg-[#0D1014] border border-[#1F2630] space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA] block">
-                Planejamento Semanal
-              </span>
-              <h3 className="text-lg sm:text-xl font-heading text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-[#FF6B1A]" />
-                Sequência de Treinos da Semana
-              </h3>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Treinos', value: `${recentStats.workouts}`, detail: 'últimos 7 dias', icon: CheckCircle2 },
+          { label: 'Tempo em quadra', value: formatMinutes(recentStats.minutes), detail: 'treino registrado', icon: Clock },
+          { label: 'Exercícios', value: `${recentStats.exercises}`, detail: 'concluídos', icon: Dumbbell },
+          { label: 'Arremessos', value: `${recentStats.shots}`, detail: 'convertidos registrados', icon: Target }
+        ].map(({ label, value, detail, icon: Icon }) => (
+          <div key={label} className="rounded-2xl border border-[#1E252D] bg-[#0D1116] p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#737D88]">{label}</span>
+              <Icon className="w-4 h-4 text-[#FF6B1A]" />
             </div>
-            <Link to="/plano" className="text-xs font-bold text-[#FF6B1A] hover:underline flex items-center gap-1">
-              Ver Plano Completo
-              <ChevronRight className="w-4 h-4" />
+            <div className="text-2xl sm:text-3xl font-heading text-white leading-none">{value}</div>
+            <div className="text-[10px] sm:text-xs text-[#68727E] mt-2">{detail}</div>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-[1.55fr_0.85fr] gap-6">
+        <div className="rounded-[24px] border border-[#1E252D] bg-[#0D1116] p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#737D88]">Sua semana</span>
+              <h3 className="text-xl sm:text-2xl font-heading text-white mt-0.5">Plano de treino</h3>
+            </div>
+            <Link to="/plano" className="inline-flex items-center gap-1 text-xs font-bold text-[#FF6B1A] hover:text-[#FF8D4D]">
+              Abrir plano <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-7 gap-2 pt-2">
-            {weeklyPlan.map((day, idx) => {
-              const isToday = day.dayOfWeek === 4; // Thursday
-
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {weeklyPlan.map((day) => {
+              const isToday = day.dayOfWeek === todayDayOfWeek;
               return (
                 <div
-                  key={idx}
-                  className={`flex flex-col items-center justify-between p-2 sm:p-3 rounded-2xl border transition-all text-center ${
+                  key={day.dayOfWeek}
+                  className={`min-w-0 rounded-xl sm:rounded-2xl border px-1.5 sm:px-2 py-3 text-center ${
                     isToday
-                      ? 'bg-[#FF6B1A]/10 border-[#FF6B1A] shadow-md shadow-[#FF6B1A]/10'
+                      ? 'border-[#FF6B1A] bg-[#FF6B1A]/10'
                       : day.completed
-                      ? 'bg-[#15191F] border-emerald-500/40 text-white'
-                      : day.isRest
-                      ? 'bg-[#11151A] border-[#1F2630] opacity-60'
-                      : 'bg-[#11151A] border-[#1F2630]'
+                        ? 'border-emerald-500/25 bg-emerald-500/[0.06]'
+                        : 'border-[#202731] bg-[#11161C]'
                   }`}
                 >
-                  <span className="text-[10px] uppercase font-bold text-[#9AA1AA]">{day.dayName}</span>
-
-                  <div className="my-2">
+                  <span className={`text-[9px] sm:text-[10px] font-bold uppercase ${isToday ? 'text-[#FF8D4D]' : 'text-[#6F7985]'}`}>
+                    {day.dayName}
+                  </span>
+                  <div className="h-8 flex items-center justify-center my-1.5">
                     {day.completed ? (
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
+                      <span className="w-7 h-7 rounded-full inline-flex items-center justify-center bg-emerald-500/15 text-emerald-400">
+                        <Check className="w-4 h-4" />
+                      </span>
                     ) : day.isRest ? (
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#1F2630] text-[#9AA1AA] flex items-center justify-center text-[10px] font-bold">
-                        OFF
-                      </div>
+                      <span className="text-[9px] font-bold text-[#626C77]">OFF</span>
                     ) : isToday ? (
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FF6B1A] text-white flex items-center justify-center shadow-lg shadow-[#FF6B1A]/40 animate-pulse">
-                        <Flame className="w-4 h-4 fill-current" />
-                      </div>
+                      <span className="w-7 h-7 rounded-full inline-flex items-center justify-center bg-[#FF6B1A] text-white">
+                        <Flame className="w-3.5 h-3.5 fill-current" />
+                      </span>
                     ) : (
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#15191F] border border-[#2B3542] text-[#9AA1AA] flex items-center justify-center text-[10px] font-mono-num font-bold">
-                        {idx + 1}
-                      </div>
+                      <span className="w-2 h-2 rounded-full bg-[#39424D]" />
                     )}
                   </div>
-
-                  <span className="text-[9px] sm:text-[10px] font-semibold line-clamp-1 text-white/90">
+                  <span className="block truncate text-[8px] sm:text-[9px] font-semibold text-[#A7AFB8]">
                     {day.isRest ? 'Descanso' : day.customTitle.split(' ')[0]}
                   </span>
                 </div>
               );
             })}
           </div>
-        </div>
 
-        {/* Resumo da Semana (Section 24) */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1014] border border-[#1F2630] flex flex-col justify-between space-y-4">
-          <div>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA] block">Métricas</span>
-            <h3 className="text-lg sm:text-xl font-heading text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#FF8D4D]" />
-              Resumo da Semana
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Treinos Concluídos</span>
-              <span className="text-2xl font-mono-num font-bold text-white">3 / 4</span>
-              <div className="w-full bg-[#11151A] rounded-full h-1.5 mt-2 overflow-hidden">
-                <div className="bg-[#FF6B1A] h-full rounded-full" style={{ width: '75%' }} />
-              </div>
+          <div className="mt-5 pt-4 border-t border-[#1D242C] flex items-center gap-4">
+            <div className="flex-1 h-2 rounded-full bg-[#161C23] overflow-hidden">
+              <div className="h-full rounded-full bg-[#FF6B1A] transition-all" style={{ width: `${weeklyPercent}%` }} />
             </div>
-
-            <div className="p-3 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Tempo em Quadra</span>
-              <span className="text-2xl font-mono-num font-bold text-white">2h35</span>
-              <span className="text-[10px] text-emerald-400 font-semibold block mt-1">+20m vs semana passada</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Exercícios</span>
-              <span className="text-2xl font-mono-num font-bold text-white">26</span>
-              <span className="text-[10px] text-[#9AA1AA] block mt-1">100% mecânica correta</span>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-[#15191F] border border-[#1F2630]">
-              <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Arremessos Convertidos</span>
-              <span className="text-2xl font-mono-num font-bold text-[#FF6B1A]">320</span>
-              <span className="text-[10px] text-[#9AA1AA] block mt-1">Meta: 500 / sem</span>
-            </div>
+            <span className="text-xs font-bold text-white whitespace-nowrap">{weeklyCompleted}/{weeklyTarget} treinos</span>
           </div>
         </div>
-      </div>
 
-      {/* 4. Quick Fundamental Skill Launchpad (Section 26) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="rounded-[24px] border border-[#FF6B1A]/20 bg-gradient-to-br from-[#15191F] to-[#0D1116] p-5 sm:p-6 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA] block">
-              Explorar Fundamentos
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-[#FF8D4D]">
+              <Zap className="w-3.5 h-3.5" /> Treino rápido
             </span>
-            <h3 className="text-xl sm:text-2xl font-heading text-white">
-              Acesso Rápido por Fundamento
-            </h3>
+            <h3 className="mt-2 text-2xl sm:text-3xl font-heading text-white leading-tight">Quanto tempo você tem?</h3>
+            <p className="mt-2 text-xs sm:text-sm text-[#858F9B] leading-relaxed">
+              Escolha seu tempo e monte uma sessão curta sem perder o foco técnico.
+            </p>
           </div>
-          <Link to="/fundamentos" className="text-xs font-bold text-[#FF6B1A] hover:underline flex items-center gap-1">
-            Ver Todos (8 Fundamentos)
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {FUNDAMENTALS_DATA.map((item) => (
-            <Link
-              key={item.id}
-              to={`/biblioteca?category=${item.id}`}
-              className="p-3.5 rounded-2xl bg-[#15191F] hover:bg-[#191E24] border border-[#1F2630] hover:border-[#FF6B1A]/60 transition-all text-center group flex flex-col items-center justify-center space-y-2"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#0D1014] text-[#FF6B1A] group-hover:scale-110 group-hover:bg-[#FF6B1A] group-hover:text-white transition-all flex items-center justify-center border border-[#1F2630]">
-                <Activity className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-heading text-white line-clamp-1 group-hover:text-[#FF6B1A] transition-colors">
-                {item.name}
-              </span>
-              <span className="text-[10px] font-mono-num text-[#9AA1AA]">
-                {item.subcategories.length} tópicos
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
+          <div className="grid grid-cols-4 gap-2 my-5">
+            {[15, 30, 45, 60].map((minutes) => (
+              <button
+                key={minutes}
+                onClick={() => navigate(`/treinar?quick=${minutes}`)}
+                className="rounded-xl border border-[#29313B] bg-[#11161C] hover:border-[#FF6B1A]/60 hover:bg-[#FF6B1A]/5 py-3 text-center transition-colors"
+              >
+                <span className="block text-lg font-heading text-white">{minutes}</span>
+                <span className="text-[9px] uppercase font-bold text-[#6F7985]">min</span>
+              </button>
+            ))}
+          </div>
 
-      {/* 5. Recommended Workouts & Radar Skill Focus (Section 25) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recommended Workouts Column */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/treinar')}
+            className="w-full min-h-11 rounded-xl bg-white text-[#0B0E12] hover:bg-[#ECEFF2] font-bold text-sm inline-flex items-center justify-center gap-2 transition-colors"
+          >
+            <TimerReset className="w-4 h-4" />
+            Montar treino rápido
+          </button>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.95fr] gap-6">
+        <div className="space-y-4">
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA] block">
-                Personalizado
-              </span>
-              <h3 className="text-xl sm:text-2xl font-heading text-white">
-                Recomendado para Você
-              </h3>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#737D88]">Próximo passo</span>
+              <h3 className="text-xl sm:text-2xl font-heading text-white">Recomendado para seu foco</h3>
+              <p className="text-xs text-[#737D88] mt-1">Baseado em {mainFocusArea.name}, sua menor autoavaliação atual.</p>
             </div>
-            <Link to="/treinar" className="text-xs font-bold text-[#FF6B1A] hover:underline flex items-center gap-1">
-              Ver Todos os Treinos
-              <ChevronRight className="w-4 h-4" />
+            <Link to="/treinar" className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-[#FF6B1A]">
+              Ver treinos <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {recommendedWorkouts.map((workout) => (
-              <WorkoutCard
-                key={workout.id}
-                workout={workout}
-                onStart={startWorkout}
-              />
+              <WorkoutCard key={workout.id} workout={workout} onStart={startWorkout} />
             ))}
           </div>
         </div>
 
-        {/* Player Radar & Focus Area Snapshot */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1014] border border-[#1F2630] flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA]">
-                Perfil de Habilidades
-              </span>
-              <Link to="/progresso" className="text-xs font-bold text-[#FF6B1A] hover:underline">
-                Ajustar Radar
-              </Link>
+        <div className="rounded-[24px] border border-[#1E252D] bg-[#0D1116] p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#737D88]">Diagnóstico técnico</span>
+              <h3 className="text-xl font-heading text-white mt-0.5">Seu jogo agora</h3>
             </div>
-            <h3 className="text-lg sm:text-xl font-heading text-white">
-              Seu Diagnóstico Técnico
-            </h3>
+            <Link to="/progresso" className="text-xs font-bold text-[#FF6B1A]">Detalhes</Link>
           </div>
 
-          {/* Mini Radar Visual */}
-          <div className="flex items-center justify-center my-2 scale-90 sm:scale-100">
-            <RadarSkillChart skills={skillsRating.slice(0, 10)} size={280} />
+          <div className="flex justify-center py-3 overflow-hidden">
+            <RadarSkillChart skills={skillsRating.slice(0, 8)} size={250} />
           </div>
 
-          {/* Strength vs Focus box */}
-          <div className="space-y-2 pt-2 border-t border-[#1F2630]">
-            <div className="p-2.5 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center justify-between text-xs">
-              <span className="text-[#9AA1AA] flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#FF6B1A]" />
-                Maior Ponto Forte:
-              </span>
-              <strong className="text-white font-mono-num">{topStrength.name} ({topStrength.score.toFixed(1)})</strong>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-[#11161C] border border-[#202731] p-3">
+              <span className="text-[9px] uppercase font-bold text-[#6F7985]">Ponto forte</span>
+              <span className="block mt-1 text-xs font-semibold text-white truncate">{topStrength.name}</span>
+              <span className="text-sm font-heading text-emerald-400">{topStrength.score.toFixed(1)}</span>
             </div>
-
-            <div className="p-2.5 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center justify-between text-xs">
-              <span className="text-[#9AA1AA] flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                Principal Foco a Desenvolver:
-              </span>
-              <strong className="text-[#FF8D4D] font-mono-num">{mainFocusArea.name} ({mainFocusArea.score.toFixed(1)})</strong>
+            <div className="rounded-xl bg-[#11161C] border border-[#202731] p-3">
+              <span className="text-[9px] uppercase font-bold text-[#6F7985]">Foco atual</span>
+              <span className="block mt-1 text-xs font-semibold text-white truncate">{mainFocusArea.name}</span>
+              <span className="text-sm font-heading text-[#FF8D4D]">{mainFocusArea.score.toFixed(1)}</span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 6. Active Weekly Goals & Challenge Progress (Section 27) */}
-      <div className="p-6 rounded-3xl bg-[#0D1014] border border-[#1F2630] space-y-4">
-        <div className="flex items-center justify-between">
+      <section className="space-y-4">
+        <div className="flex items-end justify-between gap-4">
           <div>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-[#9AA1AA] block">
-              Gamificação & Disciplina
-            </span>
-            <h3 className="text-xl sm:text-2xl font-heading text-white flex items-center gap-2">
-              <Target className="w-5 h-5 text-[#FF6B1A]" />
-              Metas da Semana
-            </h3>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-[#737D88]">Explore seu jogo</span>
+            <h3 className="text-xl sm:text-2xl font-heading text-white">Treine por fundamento</h3>
           </div>
-          <Link to="/metas" className="text-xs font-bold text-[#FF6B1A] hover:underline flex items-center gap-1">
-            Gerenciar Metas
-            <ArrowRight className="w-4 h-4" />
+          <Link to="/biblioteca" className="inline-flex items-center gap-1 text-xs font-bold text-[#FF6B1A]">
+            Biblioteca <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {goals.map((goal) => {
-            const percentage = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {FUNDAMENTALS_DATA.slice(0, 8).map((item, index) => (
+            <Link
+              key={item.id}
+              to={`/biblioteca?category=${item.id}`}
+              className="group rounded-2xl border border-[#1E252D] bg-[#0D1116] hover:border-[#FF6B1A]/45 p-4 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-[10px] font-mono-num font-bold text-[#4E5965]">0{index + 1}</span>
+                <ChevronRight className="w-4 h-4 text-[#4E5965] group-hover:text-[#FF6B1A] transition-colors" />
+              </div>
+              <span className="block text-sm font-heading text-white group-hover:text-[#FF8D4D] transition-colors truncate">{item.name}</span>
+              <span className="block mt-1 text-[10px] text-[#68727E]">{item.subcategories.length} tópicos</span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
+      <section className="rounded-[24px] border border-[#1E252D] bg-[#0D1116] p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div>
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-[#737D88]">
+              <Sparkles className="w-3.5 h-3.5 text-[#FF6B1A]" /> Disciplina
+            </span>
+            <h3 className="text-xl sm:text-2xl font-heading text-white mt-0.5">Metas em andamento</h3>
+          </div>
+          <Link to="/metas" className="text-xs font-bold text-[#FF6B1A]">Gerenciar</Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {activeGoals.map((goal) => {
+            const percentage = goal.targetValue > 0 ? Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100)) : 0;
             return (
-              <div
-                key={goal.id}
-                className="p-4 rounded-2xl bg-[#15191F] border border-[#1F2630] flex flex-col justify-between space-y-3"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold text-white line-clamp-1">{goal.title}</span>
-                    <span className="font-mono-num font-bold text-[#FF6B1A]">{percentage}%</span>
-                  </div>
-                  <div className="w-full bg-[#11151A] rounded-full h-2 overflow-hidden border border-[#1F2630]">
-                    <div
-                      className="bg-[#FF6B1A] h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+              <div key={goal.id} className="rounded-2xl border border-[#202731] bg-[#11161C] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-xs font-semibold text-white leading-snug">{goal.title}</span>
+                  <span className="text-xs font-bold text-[#FF6B1A]">{percentage}%</span>
                 </div>
-
-                <div className="flex items-center justify-between text-[11px] font-mono-num text-[#9AA1AA] pt-1">
+                <div className="h-1.5 bg-[#202731] rounded-full overflow-hidden mt-4">
+                  <div className="h-full bg-[#FF6B1A] rounded-full" style={{ width: `${percentage}%` }} />
+                </div>
+                <div className="flex items-center justify-between mt-2 text-[10px] text-[#6D7783]">
                   <span>{goal.currentValue} {goal.unit}</span>
-                  <span>Meta: {goal.targetValue}</span>
+                  <span>Meta {goal.targetValue}</span>
                 </div>
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
