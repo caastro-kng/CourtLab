@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-heading: 'Archivo Black', 'Archivo', sans-serif;
+    --font-body: 'Archivo', sans-serif;
+    --font-mono: 'Space Grotesk', monospace;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: #080A0D;
+    color: #FFFFFF;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+}
+
+.font-bebas {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.font-heading {
+  font-family: 'Archivo Black', 'Archivo', sans-serif;
+}
+
+.font-body {
+  font-family: 'Archivo', sans-serif;
+}
+
+.font-mono-num {
+  font-family: 'Space Grotesk', monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0D1014;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1F2630;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF6B1A;
+}
+
+/* Smooth court line overlay background pattern */
+.bg-court-pattern {
+  background-image: radial-gradient(circle at 50% 0%, rgba(255, 107, 26, 0.08) 0%, transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+}
+

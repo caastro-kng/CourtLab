@@ -1,0 +1,6 @@
+{
+  "name": "COURT LAB - Treinamento de Basquete",
+  "description": "Plataforma profissional de desenvolvimento técnico e treinamento individual de basquete para jogadores brasileiros. Drill, Skill, Game.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
