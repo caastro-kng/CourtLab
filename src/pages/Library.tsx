@@ -11,11 +11,14 @@ import {
   WandSparkles,
   CircleDot,
   House,
-  Trophy
+  Trophy,
+  Sparkles
 } from 'lucide-react';
 import { EXERCISES_DATA } from '../data/exercises';
 import { ExerciseCard } from '../components/common/ExerciseCard';
 import { Exercise } from '../types';
+import { usePlayer } from '../context/PlayerContext';
+import { rankExercises } from '../utils/personalization';
 
 const CATEGORY_OPTIONS = [
   { id: 'all', label: 'Todos' },
@@ -43,6 +46,7 @@ export const Library: React.FC = () => {
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
   const { onSelectExercise } = useOutletContext<{ onSelectExercise: (e: Exercise) => void }>();
+  const { profile, skillsRating, goals, mainFocusArea } = usePlayer();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
@@ -52,6 +56,11 @@ export const Library: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState(0);
   const [quickContext, setQuickContext] = useState<string | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const personalizedExercises = useMemo(
+    () => rankExercises(EXERCISES_DATA, profile, skillsRating, goals).slice(0, 3),
+    [profile, skillsRating, goals]
+  );
 
   const filteredExercises = useMemo(() => {
     return EXERCISES_DATA.filter((exercise) => {
@@ -130,6 +139,39 @@ export const Library: React.FC = () => {
           </p>
         </div>
       </section>
+
+      {selectedCategory === 'all' && !searchQuery && !quickContext && (
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#FF8D4D] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Para você agora</span>
+              <h2 className="text-xl sm:text-2xl font-heading text-white mt-1">Prioridades para {mainFocusArea.name}</h2>
+            </div>
+            <span className="text-[11px] text-[#7F8995]">Perfil + metas + autoavaliação</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {personalizedExercises.map((recommendation, index) => (
+              <button
+                key={recommendation.item.id}
+                type="button"
+                onClick={() => onSelectExercise(recommendation.item)}
+                className="rounded-2xl border border-[#FF6B1A]/25 bg-[#11151A] hover:border-[#FF6B1A]/60 p-4 text-left transition-all group"
+              >
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <span className="w-8 h-8 rounded-xl bg-[#FF6B1A]/10 text-[#FF6B1A] flex items-center justify-center text-xs font-black">#{index + 1}</span>
+                  <span className="text-[9px] uppercase font-bold tracking-wider text-[#8F98A4]">{recommendation.item.categoryLabel}</span>
+                </div>
+                <h3 className="text-base font-heading text-white group-hover:text-[#FF8D4D] transition-colors">{recommendation.item.name}</h3>
+                <p className="text-[11px] text-[#8F98A4] mt-2 leading-relaxed">{recommendation.reason}</p>
+                <div className="flex items-center gap-3 mt-4 text-[10px] text-[#ADB5BE]">
+                  <span className="flex items-center gap-1"><Clock3 className="w-3.5 h-3.5 text-[#FF6B1A]" />{recommendation.item.durationMinutes} min</span>
+                  <span>{recommendation.item.difficulty}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-4">
         <div>
