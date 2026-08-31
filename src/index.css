@@ -6,17 +6,49 @@
     --font-heading: 'Archivo Black', 'Archivo', sans-serif;
     --font-body: 'Archivo', sans-serif;
     --font-mono: 'Space Grotesk', monospace;
+
+    --cl-bg: #080A0D;
+    --cl-surface: #0D1116;
+    --cl-surface-raised: #11161C;
+    --cl-surface-hover: #151B22;
+    --cl-line: #202832;
+    --cl-line-soft: rgba(255, 255, 255, 0.06);
+    --cl-text: #FFFFFF;
+    --cl-muted: #909AA6;
+    --cl-muted-strong: #B5BDC6;
+    --cl-orange: #FF6B1A;
+    --cl-orange-hover: #FF7A2E;
+    --cl-radius-sm: 12px;
+    --cl-radius: 16px;
+    --cl-radius-lg: 24px;
+  }
+
+  html {
+    background: var(--cl-bg);
   }
 
   body {
     font-family: var(--font-body);
-    background-color: #080A0D;
-    color: #FFFFFF;
+    background-color: var(--cl-bg);
+    color: var(--cl-text);
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
     letter-spacing: -0.02em;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--cl-orange);
+    outline-offset: 2px;
   }
 }
 
@@ -37,6 +69,50 @@
   font-family: 'Space Grotesk', monospace;
 }
 
+/* CourtLab visual primitives: use one strong surface per section and dividers inside it. */
+.cl-surface {
+  background: var(--cl-surface);
+  border: 1px solid var(--cl-line-soft);
+  border-radius: var(--cl-radius-lg);
+}
+
+.cl-surface-raised {
+  background: var(--cl-surface-raised);
+  border: 1px solid var(--cl-line-soft);
+  border-radius: var(--cl-radius);
+}
+
+.cl-divider {
+  border-color: var(--cl-line-soft);
+}
+
+.cl-muted {
+  color: var(--cl-muted);
+}
+
+.cl-interactive {
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, color 160ms ease;
+}
+
+.cl-interactive:hover {
+  background-color: var(--cl-surface-hover);
+}
+
+.cl-interactive:active {
+  transform: scale(0.985);
+}
+
+/* Avoid the old "box inside box" look on purely presentational nested surfaces. */
+main [data-cl-flat-group] > [data-cl-flat-item] {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+}
+
+main [data-cl-flat-group] > [data-cl-flat-item] + [data-cl-flat-item] {
+  border-top: 1px solid var(--cl-line-soft);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -53,14 +129,24 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF6B1A;
+  background: var(--cl-orange);
 }
 
 /* Smooth court line overlay background pattern */
 .bg-court-pattern {
-  background-image: radial-gradient(circle at 50% 0%, rgba(255, 107, 26, 0.08) 0%, transparent 60%),
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-image: radial-gradient(circle at 50% 0%, rgba(255, 107, 26, 0.055) 0%, transparent 58%),
+    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
