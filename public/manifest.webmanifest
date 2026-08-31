@@ -1,0 +1,18 @@
+{
+  "name": "CourtLab - Treinamento de Basquete",
+  "short_name": "CourtLab",
+  "description": "Plataforma brasileira de desenvolvimento técnico e treinamento individual de basquete.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080A0D",
+  "theme_color": "#080A0D",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
