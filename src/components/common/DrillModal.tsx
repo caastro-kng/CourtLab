@@ -1,6 +1,24 @@
-import React, { useState } from 'react';
-import { X, Play, Clock, Flame, Shield, MapPin, CheckCircle2, AlertTriangle, ArrowRight, Video, Target, Award } from 'lucide-react';
-import { Exercise } from '../../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  X,
+  Play,
+  Clock,
+  Shield,
+  MapPin,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Video,
+  Target,
+  Award,
+  Dumbbell,
+  Plus,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sparkles
+} from 'lucide-react';
+import { Exercise, Workout } from '../../types';
 import { CourtDiagram } from './CourtDiagram';
 import { usePlayer } from '../../context/PlayerContext';
 
@@ -11,334 +29,402 @@ interface DrillModalProps {
   onStartDrill?: (exercise: Exercise) => void;
 }
 
-export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClose, onStartDrill }) => {
-  const [activeTab, setActiveTab] = useState<'instructions' | 'game-transfer' | 'video'>('instructions');
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const { addXp } = usePlayer();
+type DetailTab = 'execution' | 'transfer' | 'video';
+
+export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState<DetailTab>('execution');
+  const [showAllInstructions, setShowAllInstructions] = useState(false);
+  const [savedAsWorkout, setSavedAsWorkout] = useState(false);
+  const { startWorkout, saveCustomWorkout, customWorkouts } = usePlayer();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (exercise) {
+      setActiveTab('execution');
+      setShowAllInstructions(false);
+      setSavedAsWorkout(false);
+    }
+  }, [exercise?.id]);
+
+  const videoEmbedUrl = useMemo(() => {
+    if (!exercise) return null;
+    if (exercise.youtubeId) return `https://www.youtube.com/embed/${exercise.youtubeId}`;
+    if (exercise.videoUrl?.includes('youtube.com/watch?v=')) {
+      const id = exercise.videoUrl.split('v=')[1]?.split('&')[0];
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (exercise.videoUrl?.includes('youtu.be/')) {
+      const id = exercise.videoUrl.split('youtu.be/')[1]?.split('?')[0];
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    return null;
+  }, [exercise]);
 
   if (!isOpen || !exercise) return null;
 
-  const handleMarkPracticed = () => {
-    addXp(30);
+  const standaloneWorkout: Workout = {
+    id: `drill-${exercise.id}`,
+    title: exercise.name,
+    slug: `drill-${exercise.slug}`,
+    description: `Sessão avulsa focada em ${exercise.gameTransfer.skill}.`,
+    category: exercise.category,
+    categoryLabel: exercise.categoryLabel,
+    level: exercise.difficulty,
+    estimatedMinutes: exercise.durationMinutes,
+    exercises: [
+      {
+        exerciseId: exercise.id,
+        customSets: exercise.sets,
+        customReps: exercise.reps,
+        restSeconds: 30
+      }
+    ],
+    xpReward: Math.max(30, exercise.sets * 10),
+    tags: ['Drill avulso', exercise.categoryLabel],
+    thumbnail: exercise.thumbnail
+  };
+
+  const handleStart = () => {
+    startWorkout(standaloneWorkout);
     onClose();
   };
 
+  const handleSaveToWorkouts = () => {
+    const exists = customWorkouts.some((workout) => workout.id === standaloneWorkout.id);
+    if (!exists) saveCustomWorkout(standaloneWorkout);
+    setSavedAsWorkout(true);
+  };
+
+  const visibleInstructions = showAllInstructions
+    ? exercise.instructions
+    : exercise.instructions.slice(0, 4);
+
+  const tabs: { id: DetailTab; label: string; icon: React.ElementType }[] = [
+    { id: 'execution', label: 'Execução', icon: CheckCircle2 },
+    { id: 'transfer', label: 'DRILL → SKILL → GAME', icon: Target },
+    { id: 'video', label: 'Vídeo', icon: Video }
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div
-        className="relative w-full max-w-3xl max-h-[90vh] bg-[#0D1014] border border-[#1F2630] rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+    <div
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm sm:p-4 flex items-end sm:items-center justify-center animate-in fade-in duration-150"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="exercise-detail-title"
+        className="w-full sm:max-w-5xl h-[96dvh] sm:h-auto sm:max-h-[92vh] bg-[#0B0E12] border border-[#1F2630] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
       >
-        {/* Header with Visual Banner */}
-        <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-[#15191F] flex-shrink-0">
+        <header className="relative min-h-[220px] sm:min-h-[270px] overflow-hidden flex-shrink-0 bg-[#11151A]">
           <img
             src={exercise.thumbnail}
-            alt={exercise.name}
-            className="w-full h-full object-cover opacity-45 mix-blend-luminosity brightness-75"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-45 brightness-75"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0D1014] via-[#0D1014]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E12] via-[#0B0E12]/65 to-black/20" />
 
-          {/* Close button */}
           <button
             onClick={onClose}
-            aria-label="Fechar modal"
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white/80 hover:text-white hover:bg-black/90 transition-colors border border-white/10"
+            aria-label="Fechar detalhes do exercício"
+            className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-black/65 border border-white/10 text-white flex items-center justify-center hover:bg-black/90 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
 
-          {/* Badges on Banner */}
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="px-2.5 py-1 rounded text-[11px] font-bold tracking-wider uppercase bg-[#FF6B1A] text-white">
+          <div className="absolute left-4 right-4 bottom-5 sm:left-6 sm:right-6 sm:bottom-6">
+            <div className="flex flex-wrap gap-2 mb-3">
+              <span className="px-2.5 py-1 rounded-lg bg-[#FF6B1A] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider">
                 {exercise.categoryLabel}
               </span>
-              <span className="px-2.5 py-1 rounded text-[11px] font-semibold uppercase bg-[#1F2630] text-[#9AA1AA] border border-[#2B3542]">
+              <span className="px-2.5 py-1 rounded-lg bg-black/55 border border-white/10 text-white text-[10px] sm:text-xs font-semibold">
                 {exercise.difficulty}
               </span>
-              <span className="px-2.5 py-1 rounded text-[11px] font-mono-num font-semibold text-white/90 bg-black/50 border border-white/10 flex items-center gap-1">
-                <Clock className="w-3 h-3 text-[#FF6B1A]" />
-                {exercise.durationMinutes} MIN
+              <span className="px-2.5 py-1 rounded-lg bg-black/55 border border-white/10 text-white text-[10px] sm:text-xs font-semibold flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-[#FF6B1A]" /> {exercise.durationMinutes} min
               </span>
-              <span className="px-2.5 py-1 rounded text-[11px] font-semibold text-white/90 bg-black/50 border border-white/10 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-emerald-400" />
-                {exercise.space}
+              <span className="px-2.5 py-1 rounded-lg bg-black/55 border border-white/10 text-white text-[10px] sm:text-xs font-semibold flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {exercise.space}
               </span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-heading text-white tracking-tight leading-tight">
+
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-[#FF9B62] font-bold">
+              {exercise.subcategory}
+            </span>
+            <h2 id="exercise-detail-title" className="text-3xl sm:text-5xl font-heading text-white tracking-tight leading-none mt-1">
               {exercise.name}
             </h2>
-            <p className="text-xs sm:text-sm text-[#9AA1AA] line-clamp-1 mt-0.5">
-              {exercise.subcategory} — {exercise.description}
+            <p className="text-xs sm:text-sm text-[#B2B8C0] mt-2 max-w-3xl leading-relaxed line-clamp-2 sm:line-clamp-none">
+              {exercise.description}
             </p>
           </div>
-        </div>
+        </header>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-[#1F2630] bg-[#11151A] px-4 flex-shrink-0">
-          <button
-            onClick={() => setActiveTab('instructions')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'instructions'
-                ? 'border-[#FF6B1A] text-white'
-                : 'border-transparent text-[#9AA1AA] hover:text-white'
-            }`}
-          >
-            <CheckCircle2 className="w-4 h-4 text-[#FF6B1A]" />
-            Como Fazer & Detalhes
-          </button>
-          <button
-            onClick={() => setActiveTab('game-transfer')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'game-transfer'
-                ? 'border-[#FF6B1A] text-white'
-                : 'border-transparent text-[#9AA1AA] hover:text-white'
-            }`}
-          >
-            <Target className="w-4 h-4 text-[#FF6B1A]" />
-            Leve para o Jogo
-          </button>
-          <button
-            onClick={() => setActiveTab('video')}
-            className={`py-3 px-4 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'video'
-                ? 'border-[#FF6B1A] text-white'
-                : 'border-transparent text-[#9AA1AA] hover:text-white'
-            }`}
-          >
-            <Video className="w-4 h-4 text-[#FF6B1A]" />
-            Vídeo & Demonstração
-          </button>
-        </div>
+        <nav className="flex-shrink-0 bg-[#0F1318] border-y border-[#1F2630] overflow-x-auto scrollbar-none" aria-label="Detalhes do exercício">
+          <div className="flex min-w-max px-2 sm:px-4">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 sm:px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors flex items-center gap-2 ${
+                    active
+                      ? 'border-[#FF6B1A] text-white bg-[#FF6B1A]/5'
+                      : 'border-transparent text-[#8E969F] hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${active ? 'text-[#FF6B1A]' : ''}`} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
 
-        {/* Scrollable Modal Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
-          {activeTab === 'instructions' && (
-            <>
-              {/* Quick Specs Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-[#15191F] border border-[#1F2630]">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Séries / Sets</span>
-                  <span className="text-sm sm:text-base font-heading text-white">{exercise.sets} Séries</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Repetições</span>
-                  <span className="text-sm sm:text-base font-heading text-white">{exercise.reps}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Equipamento</span>
-                  <span className="text-xs sm:text-sm font-semibold text-[#FF8D4D]">{exercise.equipment.join(', ')}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#9AA1AA] block">Espaço</span>
-                  <span className="text-xs sm:text-sm font-semibold text-emerald-400">{exercise.space}</span>
-                </div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 pb-32 sm:pb-7">
+          {activeTab === 'execution' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <Spec label="Volume" value={`${exercise.sets} séries`} icon={Dumbbell} />
+                <Spec label="Meta" value={exercise.reps} icon={Target} />
+                <Spec label="Equipamento" value={exercise.equipment.join(', ')} icon={Sparkles} />
+                <Spec label="Espaço" value={exercise.space} icon={MapPin} />
               </div>
 
-              {/* Como Fazer (Numbered Steps) */}
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[#FF6B1A] mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Como Fazer (Passo a Passo)
-                </h3>
-                <div className="space-y-2.5">
-                  {exercise.instructions.map((step, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-[#15191F]/70 border border-[#1F2630]"
-                    >
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#FF6B1A]/20 text-[#FF6B1A] font-mono-num font-bold text-xs flex items-center justify-center border border-[#FF6B1A]/40">
-                        {index + 1}
-                      </span>
-                      <p className="text-sm text-[#FFFFFF] leading-relaxed pt-0.5">{step}</p>
+              <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5">
+                <div className="space-y-5">
+                  <section>
+                    <div className="flex items-end justify-between gap-4 mb-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF6B1A]">Execução</span>
+                        <h3 className="text-xl font-heading text-white">Como fazer</h3>
+                      </div>
                     </div>
-                  ))}
+
+                    <div className="space-y-2.5">
+                      {visibleInstructions.map((step, index) => (
+                        <div key={index} className="flex gap-3 p-3.5 rounded-2xl bg-[#12171D] border border-[#1F2630]">
+                          <span className="w-7 h-7 rounded-full bg-[#FF6B1A]/15 border border-[#FF6B1A]/35 text-[#FF8D4D] flex-shrink-0 flex items-center justify-center text-xs font-black">
+                            {index + 1}
+                          </span>
+                          <p className="text-sm text-[#E9EDF1] leading-relaxed pt-0.5">{step}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {exercise.instructions.length > 4 && (
+                      <button
+                        onClick={() => setShowAllInstructions((current) => !current)}
+                        className="mt-2 w-full py-2.5 rounded-xl text-xs font-bold text-[#A9B0B8] hover:text-white hover:bg-[#151A20] transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        {showAllInstructions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {showAllInstructions ? 'Mostrar menos' : `Ver todos os ${exercise.instructions.length} passos`}
+                      </button>
+                    )}
+                  </section>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <section className="p-4 rounded-2xl bg-emerald-500/[0.07] border border-emerald-500/20">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-2">
+                        <Shield className="w-4 h-4" /> Pontos-chave
+                      </h4>
+                      <ul className="space-y-2.5">
+                        {exercise.tips.map((tip, index) => (
+                          <li key={index} className="text-xs sm:text-sm text-[#D9E7DF] leading-relaxed flex gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+
+                    <section className="p-4 rounded-2xl bg-red-500/[0.06] border border-red-500/20">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-400 mb-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" /> Erros comuns
+                      </h4>
+                      <ul className="space-y-2.5">
+                        {exercise.commonMistakes.map((mistake, index) => (
+                          <li key={index} className="text-xs sm:text-sm text-[#E8D9DB] leading-relaxed flex gap-2">
+                            <X className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                            {mistake}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF6B1A]">Posicionamento</span>
+                    <h3 className="text-xl font-heading text-white">Onde executar</h3>
+                  </div>
+                  <CourtDiagram placement={exercise.courtPlacement || 'top'} />
+                  <div className="p-4 rounded-2xl bg-[#12171D] border border-[#1F2630]">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#8F98A2]">Antes de começar</span>
+                    <p className="text-xs sm:text-sm text-[#D1D6DC] mt-1.5 leading-relaxed">
+                      Faça as primeiras repetições em velocidade controlada. Aumente o ritmo apenas quando conseguir manter o mesmo padrão técnico.
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              {/* Pontos Importantes & Erros Comuns Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Pontos importantes */}
-                <div className="p-4 rounded-xl bg-[#131E18] border border-emerald-900/50">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2.5 flex items-center gap-1.5">
-                    <Shield className="w-4 h-4" />
-                    Pontos Importantes (Key Points)
-                  </h4>
-                  <ul className="space-y-2">
-                    {exercise.tips.map((tip, idx) => (
-                      <li key={idx} className="text-xs sm:text-sm text-emerald-100/90 flex items-start gap-2">
-                        <span className="text-emerald-400 font-bold mt-0.5">•</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Erros comuns */}
-                <div className="p-4 rounded-xl bg-[#221314] border border-red-900/50">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-red-400 mb-2.5 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4" />
-                    Erros Comuns a Evitar
-                  </h4>
-                  <ul className="space-y-2">
-                    {exercise.commonMistakes.map((mistake, idx) => (
-                      <li key={idx} className="text-xs sm:text-sm text-red-100/90 flex items-start gap-2">
-                        <span className="text-red-400 font-bold mt-0.5">•</span>
-                        <span>{mistake}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Court Placement Diagram */}
-              <CourtDiagram placement={exercise.courtPlacement || 'top'} />
-            </>
+            </div>
           )}
 
-          {activeTab === 'game-transfer' && (
+          {activeTab === 'transfer' && (
             <div className="space-y-6">
-              {/* The DRILL -> SKILL -> GAME Banner */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#191E24] to-[#12161C] border border-[#FF6B1A]/40 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-mono-num font-bold uppercase tracking-widest text-[#FF8D4D]">
-                    Conceito Fundamental COURT LAB
-                  </span>
-                  <Award className="w-5 h-5 text-[#FF6B1A]" />
-                </div>
+              <section className="p-5 sm:p-6 rounded-3xl bg-[#12171D] border border-[#FF6B1A]/30 overflow-hidden relative">
+                <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-[#FF6B1A]/10 blur-3xl" />
+                <div className="relative">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF8D4D]">Método CourtLab</span>
+                  <h3 className="text-2xl sm:text-3xl font-heading text-white mt-1">Treine o movimento. Desenvolva a skill. Use no jogo.</h3>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center my-4 py-2">
-                  <div className="p-3 bg-[#0D1014] rounded-xl border border-[#2B3542] w-full sm:w-1/3">
-                    <span className="text-[10px] uppercase text-[#9AA1AA] font-bold block">1. Treino</span>
-                    <span className="text-sm font-heading text-white">DRILL</span>
-                    <span className="text-xs text-[#9AA1AA] block mt-1">{exercise.gameTransfer.drill}</span>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-[#FF6B1A] rotate-90 sm:rotate-0 flex-shrink-0" />
-                  <div className="p-3 bg-[#0D1014] rounded-xl border border-[#2B3542] w-full sm:w-1/3">
-                    <span className="text-[10px] uppercase text-[#9AA1AA] font-bold block">2. Habilidade</span>
-                    <span className="text-sm font-heading text-[#FF6B1A]">SKILL</span>
-                    <span className="text-xs text-[#9AA1AA] block mt-1">{exercise.gameTransfer.skill}</span>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-[#FF6B1A] rotate-90 sm:rotate-0 flex-shrink-0" />
-                  <div className="p-3 bg-[#0D1014] rounded-xl border border-emerald-800/60 w-full sm:w-1/3">
-                    <span className="text-[10px] uppercase text-emerald-400 font-bold block">3. Aplicação</span>
-                    <span className="text-sm font-heading text-emerald-400">GAME</span>
-                    <span className="text-xs text-[#9AA1AA] block mt-1">Jogo Real</span>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-3 items-stretch mt-5">
+                    <TransferStep number="01" title="DRILL" text={exercise.gameTransfer.drill} />
+                    <ArrowRight className="w-5 h-5 text-[#FF6B1A] self-center justify-self-center rotate-90 md:rotate-0" />
+                    <TransferStep number="02" title="SKILL" text={exercise.gameTransfer.skill} accent />
+                    <ArrowRight className="w-5 h-5 text-[#FF6B1A] self-center justify-self-center rotate-90 md:rotate-0" />
+                    <TransferStep number="03" title="GAME" text={exercise.gameTransfer.gameSituation} game />
                   </div>
                 </div>
+              </section>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <section className="p-5 rounded-2xl bg-[#12171D] border border-[#1F2630]">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#8F98A2]">Quando usar</span>
+                  <h4 className="text-lg font-heading text-white mt-1">Situação de jogo</h4>
+                  <p className="text-sm text-[#D6DBE0] mt-2 leading-relaxed">{exercise.gameTransfer.gameSituation}</p>
+                </section>
+                <section className="p-5 rounded-2xl bg-[#12171D] border border-[#1F2630]">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#8F98A2]">O que procurar</span>
+                  <h4 className="text-lg font-heading text-white mt-1">Objetivo técnico</h4>
+                  <p className="text-sm text-[#D6DBE0] mt-2 leading-relaxed">{exercise.gameTransfer.objective}</p>
+                </section>
               </div>
 
-              {/* Game Situation Details */}
-              <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-[#15191F] border border-[#1F2630]">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#9AA1AA] mb-1">
-                    Situação Tática no Jogo
-                  </h4>
-                  <p className="text-sm sm:text-base font-semibold text-white">
-                    {exercise.gameTransfer.gameSituation}
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#15191F] border border-[#1F2630]">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#9AA1AA] mb-1">
-                    Objetivo Técnico na Quadra
-                  </h4>
-                  <p className="text-sm text-[#FFFFFF] leading-relaxed">
-                    {exercise.gameTransfer.objective}
-                  </p>
-                </div>
-              </div>
+              {exercise.gameTransfer.nbaExampleConcept && (
+                <section className="p-5 rounded-2xl border border-[#FF6B1A]/25 bg-[#FF6B1A]/[0.05] flex gap-3">
+                  <Award className="w-5 h-5 text-[#FF6B1A] flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#FF9B62]">Referência para estudar</span>
+                    <p className="text-sm text-white mt-1 leading-relaxed">{exercise.gameTransfer.nbaExampleConcept}</p>
+                  </div>
+                </section>
+              )}
 
               <CourtDiagram placement={exercise.courtPlacement || 'top'} />
             </div>
           )}
 
           {activeTab === 'video' && (
-            <div className="space-y-4">
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-[#1F2630] flex items-center justify-center group">
-                {!isVideoPlaying ? (
-                  <>
-                    <img
-                      src={exercise.thumbnail}
-                      alt={exercise.name}
-                      className="w-full h-full object-cover opacity-60"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                    <button
-                      onClick={() => setIsVideoPlaying(true)}
-                      className="absolute p-4 rounded-full bg-[#FF6B1A] text-white hover:scale-110 transition-transform shadow-xl shadow-[#FF6B1A]/30 flex items-center justify-center"
-                    >
-                      <Play className="w-6 h-6 fill-current translate-x-0.5" />
-                    </button>
-                    <div className="absolute bottom-4 left-4 right-4 text-center">
-                      <span className="text-xs uppercase font-mono-num tracking-wider text-[#9AA1AA] block">
-                        Demonstração Técnica em Vídeo
-                      </span>
-                      <span className="text-sm font-semibold text-white">
-                        ▶ Assistir execução em câmera lenta e biomecânica
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-[#11151A]">
-                    <div className="w-14 h-14 rounded-full bg-[#FF6B1A]/10 border border-[#FF6B1A] flex items-center justify-center mb-3">
-                      <Play className="w-6 h-6 text-[#FF6B1A]" />
-                    </div>
-                    <h4 className="text-base font-heading text-white mb-1">Demonstração Integrada</h4>
-                    <p className="text-xs text-[#9AA1AA] max-w-md mb-4">
-                      Em produção, o vídeo demonstrativo em alta definição com câmera lenta e ângulos múltiplos é carregado aqui.
-                    </p>
-                    <button
-                      onClick={() => setIsVideoPlaying(false)}
-                      className="px-4 py-2 rounded-lg bg-[#1F2630] text-xs font-semibold text-white hover:bg-[#2B3542]"
-                    >
-                      Voltar para thumbnail
-                    </button>
-                  </div>
-                )}
+            <div className="space-y-5">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF6B1A]">Demonstração</span>
+                <h3 className="text-2xl font-heading text-white">Veja antes de executar</h3>
+                <p className="text-sm text-[#9DA5AE] mt-1">Use o vídeo para observar ritmo, base, altura do drible e sequência dos pés.</p>
               </div>
-              <p className="text-xs text-[#9AA1AA] text-center">
-                Vídeos demonstrativos gravados com treinadores e atletas de basquete nacional e internacional.
-              </p>
+
+              {videoEmbedUrl ? (
+                <div className="aspect-video rounded-2xl overflow-hidden border border-[#1F2630] bg-black">
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`Demonstração de ${exercise.name}`}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="relative aspect-video rounded-2xl overflow-hidden border border-[#1F2630] bg-[#11151A] flex items-center justify-center">
+                  <img src={exercise.thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" referrerPolicy="no-referrer" />
+                  <div className="absolute inset-0 bg-black/45" />
+                  <div className="relative z-10 text-center px-6 max-w-md">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-[#FF6B1A]/15 border border-[#FF6B1A]/40 flex items-center justify-center mb-3">
+                      <Video className="w-6 h-6 text-[#FF6B1A]" />
+                    </div>
+                    <h4 className="text-lg font-heading text-white">Vídeo ainda não vinculado</h4>
+                    <p className="text-xs sm:text-sm text-[#A4ABB3] mt-1.5 leading-relaxed">
+                      O exercício já possui instruções, pontos-chave e aplicação no jogo. Quando uma demonstração for adicionada à base, ela aparecerá aqui.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {exercise.videoUrl && !videoEmbedUrl && (
+                <a
+                  href={exercise.videoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 rounded-xl border border-[#2B3542] bg-[#151A20] text-sm font-bold text-white flex items-center justify-center gap-2 hover:border-[#FF6B1A]/60 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4 text-[#FF6B1A]" /> Abrir vídeo original
+                </a>
+              )}
             </div>
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-[#1F2630] bg-[#11151A] flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
-          <button
-            onClick={handleMarkPracticed}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#191E24] hover:bg-[#202730] border border-[#2B3542] text-xs font-semibold text-[#FFFFFF] transition-colors flex items-center justify-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            Marcar Praticado (+30 XP)
-          </button>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+        <footer className="fixed sm:static bottom-0 left-0 right-0 z-20 p-3 sm:p-4 bg-[#0B0E12]/95 backdrop-blur-xl border-t border-[#1F2630] flex-shrink-0">
+          <div className="max-w-5xl mx-auto flex items-center gap-2 sm:gap-3">
             <button
-              onClick={onClose}
-              className="w-1/2 sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-[#9AA1AA] hover:text-white transition-colors"
+              onClick={handleSaveToWorkouts}
+              className={`h-12 sm:h-13 px-3 sm:px-5 rounded-xl border text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
+                savedAsWorkout
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  : 'bg-[#151A20] border-[#2B3542] text-white hover:border-[#FF6B1A]/50'
+              }`}
             >
-              Fechar
+              {savedAsWorkout ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-4 h-4 text-[#FF6B1A]" />}
+              <span className="hidden xs:inline sm:inline">{savedAsWorkout ? 'Salvo' : 'Adicionar aos meus treinos'}</span>
+              <span className="xs:hidden sm:hidden">{savedAsWorkout ? 'Salvo' : 'Salvar'}</span>
             </button>
+
             <button
-              onClick={() => {
-                if (onStartDrill) {
-                  onStartDrill(exercise);
-                } else {
-                  onClose();
-                }
-              }}
-              className="w-1/2 sm:w-auto px-6 py-2.5 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors shadow-lg shadow-[#FF6B1A]/20 flex items-center justify-center gap-2"
+              onClick={handleStart}
+              className="flex-1 h-12 sm:h-13 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] active:scale-[0.99] text-white font-heading text-sm sm:text-base uppercase tracking-wider transition-all shadow-lg shadow-[#FF6B1A]/20 flex items-center justify-center gap-2"
             >
-              <Flame className="w-4 h-4" />
-              Treinar Exercício
+              <Play className="w-5 h-5 fill-current" /> Treinar este drill
             </button>
           </div>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };
+
+const Spec: React.FC<{ label: string; value: string; icon: React.ElementType }> = ({ label, value, icon: Icon }) => (
+  <div className="p-3.5 rounded-2xl bg-[#12171D] border border-[#1F2630] min-w-0">
+    <span className="text-[10px] uppercase font-bold tracking-wider text-[#838C96] flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5 text-[#FF6B1A]" /> {label}
+    </span>
+    <span className="text-sm font-bold text-white block mt-1 truncate" title={value}>{value}</span>
+  </div>
+);
+
+const TransferStep: React.FC<{ number: string; title: string; text: string; accent?: boolean; game?: boolean }> = ({ number, title, text, accent, game }) => (
+  <div className={`p-4 rounded-2xl border ${game ? 'border-emerald-500/30 bg-emerald-500/[0.05]' : accent ? 'border-[#FF6B1A]/35 bg-[#FF6B1A]/[0.06]' : 'border-[#2B3542] bg-[#0D1014]'}`}>
+    <span className={`text-[10px] font-black tracking-widest ${game ? 'text-emerald-400' : accent ? 'text-[#FF8D4D]' : 'text-[#7F8994]'}`}>{number}</span>
+    <h4 className={`text-xl font-heading mt-1 ${game ? 'text-emerald-400' : accent ? 'text-[#FF6B1A]' : 'text-white'}`}>{title}</h4>
+    <p className="text-xs text-[#A7AEB6] leading-relaxed mt-2">{text}</p>
+  </div>
+);
