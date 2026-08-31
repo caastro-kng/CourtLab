@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Flame, Award, Plus, User, Sparkles } from 'lucide-react';
+import { Search, Flame, Award, Plus } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -13,19 +13,27 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-[#080A0D]/90 backdrop-blur-md border-b border-[#1F2630] px-4 sm:px-6 flex items-center justify-between">
-      {/* Brand & Mobile Title */}
       <div className="flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-[#FF6B1A] flex items-center justify-center font-heading font-black text-white text-lg tracking-wider group-hover:scale-105 transition-transform shadow-md shadow-[#FF6B1A]/30">
-            CL
+        <Link to="/" className="flex items-center gap-2.5 group" aria-label="Ir para o início do CourtLab">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden border border-[#FF6B1A]/25 shadow-md shadow-[#FF6B1A]/10 group-hover:border-[#FF6B1A]/50 group-hover:scale-[1.03] transition-all">
+            <img
+              src="/court-lab-mark.svg"
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover"
+            />
           </div>
-          <span className="font-heading font-black text-lg sm:text-xl tracking-tight text-white flex items-center gap-1">
-            COURT <span className="text-[#FF6B1A]">LAB</span>
-          </span>
+          <div className="flex flex-col justify-center leading-none">
+            <span className="font-heading font-black text-lg sm:text-xl tracking-tight text-white">
+              COURT <span className="text-[#FF6B1A]">LAB</span>
+            </span>
+            <span className="hidden sm:block text-[8px] uppercase font-bold tracking-[0.18em] text-[#707985] mt-1">
+              Train • Improve • Compete
+            </span>
+          </div>
         </Link>
       </div>
 
-      {/* Global Search Bar (Trigger for Modal) */}
       <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
         <button
           onClick={onOpenSearch}
@@ -41,9 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
         </button>
       </div>
 
-      {/* Gamification, Streak & Quick Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Mobile Search Button */}
         <button
           onClick={onOpenSearch}
           className="md:hidden p-2 rounded-xl bg-[#11151A] text-[#9AA1AA] hover:text-white border border-[#1F2630]"
@@ -52,14 +58,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           <Search className="w-4 h-4" />
         </button>
 
-        {/* Streak Pill */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/30 text-white text-xs font-mono-num font-bold">
           <Flame className="w-4 h-4 text-[#FF6B1A] fill-[#FF6B1A]" />
           <span>{currentStreakDays}</span>
           <span className="hidden sm:inline text-[10px] text-[#9AA1AA] font-normal">DIAS</span>
         </div>
 
-        {/* XP & Tier Pill */}
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#11151A] border border-[#1F2630] text-xs">
           <Award className="w-3.5 h-3.5 text-[#FF8D4D]" />
           <span className="font-mono-num font-bold text-white">{xp} XP</span>
@@ -68,7 +72,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           </span>
         </div>
 
-        {/* Build Custom Workout CTA */}
         <button
           onClick={() => navigate('/treinar?tab=builder')}
           className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#191E24] hover:bg-[#202730] border border-[#2B3542] text-xs font-bold uppercase tracking-wider text-white transition-colors"
@@ -77,7 +80,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           <span>Montar Treino</span>
         </button>
 
-        {/* Profile Avatar */}
         <Link
           to="/perfil"
           className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-[#11151A] hover:bg-[#15191F] border border-[#1F2630] transition-colors"
