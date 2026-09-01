@@ -109,6 +109,11 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     youtubeId: 'k9GckaZVJj8',
     videoUrl: 'https://www.youtube.com/watch?v=k9GckaZVJj8',
     source: 'Jr. NBA Jr. WNBA — Fundamentals Of The Backdoor Cut'
+  },
+  'ob-02': {
+    youtubeId: '85WXNSGpV3w',
+    videoUrl: 'https://www.youtube.com/watch?v=85WXNSGpV3w',
+    source: 'Dr. Dish Basketball — Flare Screen Shooting with Tony Miller'
   }
 };
 
