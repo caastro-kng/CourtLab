@@ -14,21 +14,21 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({ workout, onStart, feat
 
   return (
     <article
-      className={`group relative bg-[#0F141A] border ${
+      className={`group cl-card-lift relative bg-[#0F141A] border ${
         featured ? 'border-[#FF6B1A]/35' : 'border-white/[0.06]'
-      } hover:border-white/[0.13] rounded-[20px] overflow-hidden transition-all duration-200 flex flex-col h-full`}
+      } hover:border-white/[0.13] rounded-[20px] overflow-hidden flex flex-col h-full`}
     >
       <span className="absolute inset-x-0 top-0 h-[2px] z-20" style={{ backgroundColor: visual.accent }} />
       <div className="relative h-44 w-full overflow-hidden bg-[#0A0D11]">
         <img
           src={workout.thumbnail}
           alt=""
-          className="w-full h-full object-cover group-hover:scale-[1.025] transition-transform duration-500 opacity-62 brightness-75 saturate-75"
+          className="w-full h-full object-cover group-hover:scale-[1.035] transition-transform duration-500 opacity-62 brightness-75 saturate-75"
           referrerPolicy="no-referrer"
           loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0F141A] via-[#0F141A]/28 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-20 opacity-65" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-20 opacity-65 group-hover:opacity-85 transition-opacity duration-300" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
 
         <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-wider uppercase bg-black/55 text-white backdrop-blur-sm">
@@ -68,11 +68,11 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({ workout, onStart, feat
           <span className="text-[10px] uppercase tracking-wider font-bold text-[#717B86]">Sessão pronta</span>
           <button
             onClick={() => onStart(workout)}
-            className="min-h-10 px-4 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] active:scale-[0.98] text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6B1A]"
+            className="min-h-10 px-4 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6B1A]"
           >
-            <Flame className="w-3.5 h-3.5" />
+            <Flame className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
             Começar
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       </div>
