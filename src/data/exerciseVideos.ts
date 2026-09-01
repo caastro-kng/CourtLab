@@ -45,10 +45,50 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=ow16151mQDE',
     source: 'ILoveBasketballTV — Catch and Shoot Drill for Shooting Footwork'
   },
+  'sh-03': {
+    youtubeId: 'Auzwv0cDHIc',
+    videoUrl: 'https://www.youtube.com/watch?v=Auzwv0cDHIc',
+    source: 'Jr. NBA Jr. WNBA — The Shot Fake 1-Dribble Pull-Up Drill'
+  },
+  'sh-04': {
+    youtubeId: 'I3ciH34vjEY',
+    videoUrl: 'https://www.youtube.com/watch?v=I3ciH34vjEY',
+    source: 'ShotMechanics — How to: Step Back Basketball Move'
+  },
   'fn-01': {
     youtubeId: 'Q1LiWKc8-Ls',
     videoUrl: 'https://www.youtube.com/watch?v=Q1LiWKc8-Ls',
     source: 'TeamSnap — The Mikan Drill'
+  },
+  'fn-03': {
+    youtubeId: 'YlLibwaQJF0',
+    videoUrl: 'https://www.youtube.com/watch?v=YlLibwaQJF0',
+    source: 'Jr. NBA Jr. WNBA — Euro-Step Breakdown Drill'
+  },
+  'fn-04': {
+    youtubeId: 'TXwUjMcJT3Y',
+    videoUrl: 'https://www.youtube.com/watch?v=TXwUjMcJT3Y',
+    source: 'Ryan Bennett — Same Foot Same Hand Layup'
+  },
+  'pnr-01': {
+    youtubeId: '3hRXONs0B8E',
+    videoUrl: 'https://www.youtube.com/watch?v=3hRXONs0B8E',
+    source: 'Dr. Dish Basketball — Pick & Roll Progression with Skylar Diggins-Smith'
+  },
+  'df-01': {
+    youtubeId: 'nOwQXU7IHZg',
+    videoUrl: 'https://www.youtube.com/watch?v=nOwQXU7IHZg',
+    source: 'Jr. NBA Jr. WNBA — Fundamentals Of The Closeout'
+  },
+  'df-02': {
+    youtubeId: 'aSvFDJcIzys',
+    videoUrl: 'https://www.youtube.com/watch?v=aSvFDJcIzys',
+    source: 'Jr. NBA Jr. WNBA — Closeout, Slide and Backpedal Drill'
+  },
+  'ob-01': {
+    youtubeId: 'k9GckaZVJj8',
+    videoUrl: 'https://www.youtube.com/watch?v=k9GckaZVJj8',
+    source: 'Jr. NBA Jr. WNBA — Fundamentals Of The Backdoor Cut'
   }
 };
 
