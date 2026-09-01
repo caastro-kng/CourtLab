@@ -31,7 +31,7 @@ const PageFallback = () => (
 );
 
 const SessionGate: React.FC = () => {
-  const { session, loading } = useAuth();
+  const { session, loading, passwordRecovery } = useAuth();
 
   if (loading) {
     return (
@@ -44,6 +44,7 @@ const SessionGate: React.FC = () => {
     );
   }
 
+  if (passwordRecovery) return <Auth initialMode="recovery" />;
   if (!session) return <Auth />;
 
   return (

@@ -8,12 +8,15 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  passwordRecovery: boolean;
   configured: boolean;
   configurationError: string | null;
   signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
+  updatePassword: (password: string) => Promise<AuthResult>;
+  cancelPasswordRecovery: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,6 +56,9 @@ const authErrorMessage = (error: unknown) => {
   if (code === 'over_request_rate_limit' || normalizedMessage.includes('too many requests')) {
     return 'Muitas tentativas foram feitas. Aguarde alguns minutos e tente novamente.';
   }
+  if (code === 'session_not_found' || normalizedMessage.includes('auth session missing')) {
+    return 'Este link de recuperação é inválido ou expirou. Solicite um novo link.';
+  }
 
   if (message) return message;
   return 'Não foi possível concluir a autenticação. Tente novamente.';
@@ -60,9 +66,16 @@ const authErrorMessage = (error: unknown) => {
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+const isPasswordRecoveryUrl = () => {
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return search.get('mode') === 'recovery' || hash.get('type') === 'recovery';
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(isPasswordRecoveryUrl);
 
   useEffect(() => {
     if (!supabase) {
@@ -84,9 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mounted) setLoading(false);
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      if (event === 'SIGNED_OUT') setPasswordRecovery(false);
     });
 
     return () => {
@@ -99,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user: session?.user ?? null,
     session,
     loading,
+    passwordRecovery,
     configured: supabaseConfigured,
     configurationError: supabaseConfigurationError,
     signUp: async (name, email, password) => {
@@ -132,7 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!supabase) return {};
       try {
         const { error } = await supabase.auth.signOut();
-        return error ? { error: authErrorMessage(error) } : {};
+        if (error) return { error: authErrorMessage(error) };
+        setPasswordRecovery(false);
+        return {};
       } catch (error) {
         return { error: authErrorMessage(error) };
       }
@@ -141,14 +159,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!supabase) return { error: supabaseConfigurationError ?? 'Supabase ainda não está configurado no ambiente.' };
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
-          redirectTo: `${window.location.origin}/`
+          redirectTo: `${window.location.origin}/?mode=recovery`
         });
         return error ? { error: authErrorMessage(error) } : {};
       } catch (error) {
         return { error: authErrorMessage(error) };
       }
+    },
+    updatePassword: async (password) => {
+      if (!supabase) return { error: supabaseConfigurationError ?? 'Supabase ainda não está configurado no ambiente.' };
+      try {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) return { error: authErrorMessage(error) };
+        setPasswordRecovery(false);
+        window.history.replaceState(null, '', '/');
+        return {};
+      } catch (error) {
+        return { error: authErrorMessage(error) };
+      }
+    },
+    cancelPasswordRecovery: () => {
+      setPasswordRecovery(false);
+      window.history.replaceState(null, '', '/');
     }
-  }), [loading, session]);
+  }), [loading, passwordRecovery, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

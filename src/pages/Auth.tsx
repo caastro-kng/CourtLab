@@ -2,32 +2,44 @@ import React, { useState } from 'react';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-type Mode = 'login' | 'register' | 'forgot';
+type Mode = 'login' | 'register' | 'forgot' | 'recovery';
 
-export const Auth: React.FC = () => {
-  const { signIn, signUp, resetPassword, configured, configurationError } = useAuth();
-  const [mode, setMode] = useState<Mode>('login');
+export const Auth: React.FC<{ initialMode?: Mode }> = ({ initialMode = 'login' }) => {
+  const { signIn, signUp, resetPassword, updatePassword, cancelPasswordRecovery, configured, configurationError } = useAuth();
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const changeMode = (nextMode: Mode) => {
+    if (mode === 'recovery' && nextMode !== 'recovery') cancelPasswordRecovery();
     setMode(nextMode);
     setError('');
     setMessage('');
+    setPassword('');
+    setConfirmPassword('');
   };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
     setMessage('');
+
+    if ((mode === 'register' || mode === 'recovery') && password !== confirmPassword) {
+      setError('As senhas não coincidem. Digite a mesma senha nos dois campos.');
+      return;
+    }
+
     setLoading(true);
 
-    const result = await (mode === 'register'
+    const result = await (mode === 'recovery'
+      ? updatePassword(password)
+      : mode === 'register'
       ? signUp(name, email, password)
       : mode === 'forgot'
         ? resetPassword(email)
@@ -79,10 +91,10 @@ export const Auth: React.FC = () => {
 
           <span className="cl-kicker text-[#FF6B1A]">Acesso do atleta</span>
           <h2 className="cl-page-title mt-2">
-            {mode === 'register' ? 'CRIAR CONTA' : mode === 'forgot' ? 'RECUPERAR ACESSO' : 'ENTRAR NO COURTLAB'}
+            {mode === 'register' ? 'CRIAR CONTA' : mode === 'forgot' ? 'RECUPERAR ACESSO' : mode === 'recovery' ? 'CRIAR NOVA SENHA' : 'ENTRAR NO COURTLAB'}
           </h2>
           <p className="cl-body-copy mt-3">
-            {mode === 'register' ? 'Crie sua identidade de atleta e mantenha sua evolução vinculada à sua conta.' : mode === 'forgot' ? 'Informe seu e-mail para receber o link de recuperação.' : 'Continue de onde parou e volte para a quadra.'}
+            {mode === 'register' ? 'Crie sua identidade de atleta e mantenha sua evolução vinculada à sua conta.' : mode === 'forgot' ? 'Informe seu e-mail para receber o link de recuperação.' : mode === 'recovery' ? 'Escolha uma nova senha para continuar acessando sua conta.' : 'Continue de onde parou e volte para a quadra.'}
           </p>
 
           {!configured && <div role="alert" className="mt-6 p-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] text-sm text-amber-200">{configurationError ?? 'As variáveis do Supabase ainda não estão disponíveis neste ambiente.'}</div>}
@@ -90,20 +102,21 @@ export const Auth: React.FC = () => {
           {error && <div role="alert" aria-live="assertive" className="mt-6 p-4 rounded-2xl border border-red-400/25 bg-red-400/[0.06] text-sm text-red-300">{error}</div>}
 
           <form onSubmit={submit} aria-busy={loading} className="mt-8 space-y-4">
-            {mode === 'register' && <label className="block"><span className="cl-label text-[#8F98A4]">Nome</span><div className="mt-2 relative"><UserRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required value={name} onChange={(e)=>setName(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Seu nome" /></div></label>}
-            <label className="block"><span className="cl-label text-[#8F98A4]">E-mail</span><div className="mt-2 relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required type="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="voce@email.com" /></div></label>
-            {mode !== 'forgot' && <label className="block"><span className="cl-label text-[#8F98A4]">Senha</span><div className="mt-2 relative"><LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required minLength={6} type={showPassword?'text':'password'} value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-11 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Mínimo de 6 caracteres" /><button type="button" onClick={()=>setShowPassword((v)=>!v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#697481] hover:text-white" aria-label="Mostrar ou ocultar senha">{showPassword?<EyeOff className="w-4 h-4"/>:<Eye className="w-4 h-4"/>}</button></div></label>}
+            {mode === 'register' && <label className="block"><span className="cl-label text-[#8F98A4]">Nome</span><div className="mt-2 relative"><UserRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required autoComplete="name" value={name} onChange={(e)=>setName(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Seu nome" /></div></label>}
+            {mode !== 'recovery' && <label className="block"><span className="cl-label text-[#8F98A4]">E-mail</span><div className="mt-2 relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required type="email" autoComplete="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="voce@email.com" /></div></label>}
+            {mode !== 'forgot' && <label className="block"><span className="cl-label text-[#8F98A4]">{mode === 'recovery' ? 'Nova senha' : 'Senha'}</span><div className="mt-2 relative"><LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} type={showPassword?'text':'password'} value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-11 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Mínimo de 6 caracteres" /><button type="button" onClick={()=>setShowPassword((v)=>!v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#697481] hover:text-white" aria-label="Mostrar ou ocultar senha">{showPassword?<EyeOff className="w-4 h-4"/>:<Eye className="w-4 h-4"/>}</button></div></label>}
+            {(mode === 'register' || mode === 'recovery') && <label className="block"><span className="cl-label text-[#8F98A4]">Confirmar senha</span><div className="mt-2 relative"><LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required minLength={6} autoComplete="new-password" type={showPassword?'text':'password'} value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Repita a senha" /></div></label>}
 
             {mode === 'login' && <div className="flex justify-end"><button type="button" onClick={()=>changeMode('forgot')} className="text-xs font-semibold text-[#FF8D4D]">Esqueci minha senha</button></div>}
 
             <button type="submit" disabled={loading || !configured} className="w-full min-h-12 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] disabled:opacity-50 disabled:cursor-not-allowed cl-button-text text-white flex items-center justify-center gap-2">
-              {loading ? 'Processando...' : mode === 'register' ? 'Criar minha conta' : mode === 'forgot' ? 'Enviar recuperação' : 'Entrar'}
+              {loading ? 'Processando...' : mode === 'register' ? 'Criar minha conta' : mode === 'forgot' ? 'Enviar recuperação' : mode === 'recovery' ? 'Salvar nova senha' : 'Entrar'}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
           <div className="mt-6 pt-6 border-t border-white/[0.07] text-center text-sm text-[#8F98A4]">
-            {mode === 'register' ? <>Já possui conta? <button onClick={()=>changeMode('login')} className="font-bold text-white">Entrar</button></> : mode === 'forgot' ? <button onClick={()=>changeMode('login')} className="font-bold text-white">Voltar para entrar</button> : <>Ainda não tem conta? <button onClick={()=>changeMode('register')} className="font-bold text-white">Criar conta</button></>}
+            {mode === 'register' ? <>Já possui conta? <button onClick={()=>changeMode('login')} className="font-bold text-white">Entrar</button></> : mode === 'forgot' ? <button onClick={()=>changeMode('login')} className="font-bold text-white">Voltar para entrar</button> : mode === 'recovery' ? <>Link inválido ou expirado? <button onClick={()=>changeMode('forgot')} className="font-bold text-white">Solicitar outro</button></> : <>Ainda não tem conta? <button onClick={()=>changeMode('register')} className="font-bold text-white">Criar conta</button></>}
           </div>
         </div>
       </main>
