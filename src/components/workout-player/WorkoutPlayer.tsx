@@ -3,7 +3,6 @@ import {
   X,
   Play,
   Pause,
-  RotateCcw,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -21,7 +20,10 @@ import {
   Plus,
   Video,
   ExternalLink,
-  Eye
+  Eye,
+  EyeOff,
+  Focus,
+  Footprints
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Workout, Exercise } from '../../types';
@@ -35,6 +37,7 @@ interface WorkoutPlayerProps {
 }
 
 type Difficulty = 'Muito difícil' | 'Difícil' | 'Bom' | 'Fácil';
+type RestContext = 'between-sets' | 'between-exercises';
 
 export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }) => {
   const { getExerciseById, completeWorkoutSession, currentStreakDays } = usePlayer();
@@ -42,12 +45,14 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
   const [isResting, setIsResting] = useState(false);
+  const [restContext, setRestContext] = useState<RestContext>('between-sets');
   const [restSecondsLeft, setRestSecondsLeft] = useState(30);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [activeDrillTimer, setActiveDrillTimer] = useState(45);
   const [totalSecondsElapsed, setTotalSecondsElapsed] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [resumeTimerAfterVideo, setResumeTimerAfterVideo] = useState(false);
@@ -93,6 +98,8 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   const progressPercent = totalPlannedSets > 0
     ? Math.min(100, Math.round((completedSets / totalPlannedSets) * 100))
     : Math.round(((currentExerciseIndex + 1) / Math.max(1, totalExercises)) * 100);
+
+  const shouldReduceDetails = focusMode || isTimerRunning;
 
   useEffect(() => {
     if (isCompleted) return;
@@ -207,11 +214,18 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   };
 
   const handleCompleteSet = () => {
+    if (isResting) {
+      setIsResting(false);
+      return;
+    }
+
     playBeep();
+    setIsTimerRunning(false);
     setCompletedSets((prev) => Math.min(totalPlannedSets, prev + 1));
 
     if (currentSet < targetSets) {
       setCurrentSet((prev) => prev + 1);
+      setRestContext('between-sets');
       setRestSecondsLeft(restDuration);
       setIsResting(true);
       return;
@@ -220,6 +234,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     if (currentExerciseIndex < totalExercises - 1) {
       setCurrentExerciseIndex((prev) => prev + 1);
       setCurrentSet(1);
+      setRestContext('between-exercises');
       setRestSecondsLeft(restDuration + 15);
       setIsResting(true);
       resetDrillTimer();
@@ -363,22 +378,31 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     );
   }
 
+  const footerLabel = isResting
+    ? restContext === 'between-exercises' ? 'Começar próximo drill' : `Começar série ${currentSet}`
+    : currentSet < targetSets
+      ? 'Concluir série'
+      : currentExerciseIndex < totalExercises - 1
+        ? 'Concluir exercício'
+        : 'Finalizar treino';
+
   return (
     <div className="fixed inset-0 z-50 bg-[#080A0D] text-white flex flex-col select-none">
-      <header className="flex-shrink-0 bg-[#0B0E12]/95 backdrop-blur-xl border-b border-[#1F2630] pt-[env(safe-area-inset-top)]">
-        <div className="h-16 max-w-5xl mx-auto px-3 sm:px-5 flex items-center justify-between gap-3">
+      <header className="flex-shrink-0 bg-[#0B0E12]/96 backdrop-blur-xl border-b border-white/[0.06] pt-[env(safe-area-inset-top)]">
+        <div className="h-15 sm:h-16 max-w-5xl mx-auto px-3 sm:px-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <button onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Sair do treino"><X className="w-5 h-5" /></button>
+            <button onClick={() => setShowExitConfirm(true)} className="w-10 h-10 rounded-xl bg-[#15191F] border border-white/[0.06] flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Sair do treino"><X className="w-5 h-5" /></button>
             <div className="min-w-0">
               <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-[#FF6B1A] block">Modo quadra</span>
-              <h2 className="text-sm font-bold text-white truncate">{workout.title}</h2>
+              <h2 className="text-xs sm:text-sm font-bold text-white truncate">{workout.title}</h2>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 h-9 rounded-xl bg-[#11151A] border border-[#1F2630] text-xs font-mono-num font-bold"><Clock className="w-3.5 h-3.5 text-[#FF6B1A]" />{formatTime(totalSecondsElapsed)}</div>
-            <button onClick={() => setIsMuted((v) => !v)} className="w-9 h-9 rounded-xl bg-[#11151A] border border-[#1F2630] flex items-center justify-center text-[#9AA1AA]" aria-label={isMuted ? 'Ativar áudio' : 'Silenciar áudio'}>{isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}</button>
-            <button onClick={toggleFullscreen} className="w-9 h-9 rounded-xl bg-[#11151A] border border-[#1F2630] flex items-center justify-center text-[#9AA1AA]" aria-label="Alternar tela cheia">{isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}</button>
+            <div className="hidden sm:flex items-center gap-1.5 px-3 h-9 rounded-xl bg-[#11151A] border border-white/[0.06] text-xs font-mono-num font-bold"><Clock className="w-3.5 h-3.5 text-[#FF6B1A]" />{formatTime(totalSecondsElapsed)}</div>
+            <button onClick={() => setFocusMode((value) => !value)} className={`w-9 h-9 rounded-xl border flex items-center justify-center ${focusMode ? 'bg-[#FF6B1A]/12 border-[#FF6B1A]/30 text-[#FF8D4D]' : 'bg-[#11151A] border-white/[0.06] text-[#9AA1AA]'}`} aria-label={focusMode ? 'Sair do modo foco' : 'Ativar modo foco'} title={focusMode ? 'Sair do modo foco' : 'Modo foco'}>{focusMode ? <EyeOff className="w-4 h-4" /> : <Focus className="w-4 h-4" />}</button>
+            <button onClick={() => setIsMuted((v) => !v)} className="w-9 h-9 rounded-xl bg-[#11151A] border border-white/[0.06] flex items-center justify-center text-[#9AA1AA]" aria-label={isMuted ? 'Ativar áudio' : 'Silenciar áudio'}>{isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}</button>
+            <button onClick={toggleFullscreen} className="hidden sm:flex w-9 h-9 rounded-xl bg-[#11151A] border border-white/[0.06] items-center justify-center text-[#9AA1AA]" aria-label="Alternar tela cheia">{isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}</button>
           </div>
         </div>
 
@@ -387,138 +411,158 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-5xl mx-auto min-h-full px-4 sm:px-6 py-5 sm:py-7 flex flex-col">
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="max-w-5xl mx-auto min-h-full px-4 sm:px-6 py-4 sm:py-7 flex flex-col">
           {isResting ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
-              <span className="text-[10px] uppercase font-bold tracking-[0.25em] text-emerald-400">Recuperação</span>
-              <h1 className="text-3xl sm:text-5xl font-heading mt-1">DESCANSO</h1>
-              <div className="my-7 w-48 h-48 sm:w-60 sm:h-60 rounded-full border-[6px] border-emerald-500/15 bg-[#0D1014] flex flex-col items-center justify-center shadow-2xl shadow-emerald-500/5">
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-5 sm:py-8">
+              <span className="text-[10px] uppercase font-bold tracking-[0.25em] text-emerald-400">{restContext === 'between-exercises' ? 'Transição de drill' : 'Recuperação entre séries'}</span>
+              <h1 className="text-3xl sm:text-5xl font-heading mt-1">{restContext === 'between-exercises' ? 'PRÓXIMO DRILL' : 'DESCANSO'}</h1>
+
+              <div className="my-5 sm:my-7 w-44 h-44 sm:w-56 sm:h-56 rounded-full border-[6px] border-emerald-500/15 bg-[#0D1014] flex flex-col items-center justify-center shadow-2xl shadow-emerald-500/5">
                 <span className="text-6xl sm:text-8xl font-mono-num font-black text-emerald-400 leading-none">{restSecondsLeft}</span>
                 <span className="text-[10px] uppercase tracking-widest text-[#707985] mt-2">segundos</span>
               </div>
-              <p className="max-w-sm text-sm text-[#9AA1AA]">Respire, hidrate e prepare o próximo esforço.</p>
-              <button onClick={() => setIsResting(false)} className="mt-6 min-h-12 px-6 rounded-xl bg-[#15191F] border border-[#2B3542] font-bold text-xs uppercase tracking-wider flex items-center gap-2"><SkipForward className="w-4 h-4" />Pular descanso</button>
+
+              <div className="w-full max-w-xl border-y border-white/[0.06] py-4 sm:py-5 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#FF6B1A]/10 flex items-center justify-center shrink-0"><Footprints className="w-5 h-5 text-[#FF6B1A]" /></div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#737D88]">{restContext === 'between-exercises' ? 'Você vai fazer agora' : `Próxima série · ${currentSet}/${targetSets}`}</span>
+                    <h2 className="text-lg sm:text-xl font-heading text-white mt-0.5">{exercise.name}</h2>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#8F98A4] mt-1.5">
+                      <span>{currentItem.customReps || exercise.reps || 'Qualidade máxima'}</span>
+                      <span>{exercise.categoryLabel}</span>
+                      {(videoEmbedUrl || exercise.videoUrl) && <button onClick={openVideoDemo} className="text-[#FF8D4D] font-bold inline-flex items-center gap-1"><Video className="w-3.5 h-3.5" />Ver vídeo</button>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={() => setIsResting(false)} className="mt-5 min-h-12 px-6 rounded-xl bg-[#15191F] border border-white/[0.08] font-bold text-xs uppercase tracking-wider flex items-center gap-2"><SkipForward className="w-4 h-4" />Pular descanso</button>
             </div>
           ) : (
-            <div className="flex-1 grid lg:grid-cols-[1fr_300px] gap-5 lg:gap-7">
-              <section className="flex flex-col gap-4">
+            <div className={`flex-1 ${shouldReduceDetails ? 'flex flex-col justify-center' : 'grid lg:grid-cols-[1fr_300px] gap-5 lg:gap-7'}`}>
+              <section className={`flex flex-col ${shouldReduceDetails ? 'gap-5' : 'gap-4'}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-[#FF8D4D]">Exercício {currentExerciseIndex + 1} de {totalExercises}</span>
-                    <h1 className="text-3xl sm:text-5xl font-heading leading-[0.95] mt-1">{exercise.name}</h1>
-                    <p className="text-sm text-[#9AA1AA] mt-2">{exercise.categoryLabel} • {exercise.subcategory}</p>
-                    {(videoEmbedUrl || exercise.videoUrl) && (
-                      <button onClick={openVideoDemo} className="mt-3 min-h-10 px-4 rounded-xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/35 text-[#FF8D4D] hover:bg-[#FF6B1A]/15 font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                        <Video className="w-4 h-4" />
-                        Ver demonstração
-                      </button>
-                    )}
+                    <h1 className={`${shouldReduceDetails ? 'text-3xl sm:text-4xl' : 'text-3xl sm:text-5xl'} font-heading leading-[0.95] mt-1`}>{exercise.name}</h1>
+                    {!shouldReduceDetails && <p className="text-sm text-[#9AA1AA] mt-2">{exercise.categoryLabel} • {exercise.subcategory}</p>}
                   </div>
                   <div className="flex-shrink-0 text-right">
                     <span className="text-[9px] uppercase font-bold text-[#707985] block">Série</span>
-                    <span className="text-2xl font-mono-num font-black text-[#FF6B1A]">{currentSet}/{targetSets}</span>
+                    <span className="text-3xl sm:text-4xl font-mono-num font-black text-[#FF6B1A]">{currentSet}/{targetSets}</span>
                   </div>
                 </div>
 
-                <div className="rounded-3xl bg-[#0D1014] border border-[#1F2630] overflow-hidden">
-                  <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#707985]">Cronômetro</span>
-                      <div className="text-6xl sm:text-7xl font-mono-num font-black tracking-tight leading-none mt-1">{formatTime(activeDrillTimer)}</div>
+                <div className={`bg-[#0D1014] border border-white/[0.06] overflow-hidden ${shouldReduceDetails ? 'rounded-[28px]' : 'rounded-3xl'}`}>
+                  <div className={`${shouldReduceDetails ? 'p-5 sm:p-8' : 'p-5 sm:p-6'} flex flex-col sm:flex-row sm:items-end justify-between gap-5`}>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-[#707985]">Cronômetro</span>
+                        {isTimerRunning && <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400">• em andamento</span>}
+                      </div>
+                      <div className={`${shouldReduceDetails ? 'text-7xl sm:text-8xl lg:text-9xl' : 'text-6xl sm:text-7xl'} font-mono-num font-black tracking-tight leading-none mt-1`}>{formatTime(activeDrillTimer)}</div>
                       <div className="flex items-center gap-2 mt-3">
-                        <button onClick={() => setActiveDrillTimer((v) => Math.max(5, v - 15))} className="px-3 py-1.5 rounded-lg bg-[#15191F] border border-[#1F2630] text-xs font-bold">-15s</button>
-                        <button onClick={() => setActiveDrillTimer((v) => v + 15)} className="px-3 py-1.5 rounded-lg bg-[#15191F] border border-[#1F2630] text-xs font-bold">+15s</button>
+                        <button onClick={() => setActiveDrillTimer((v) => Math.max(5, v - 15))} className="px-3 py-1.5 rounded-lg bg-[#15191F] border border-white/[0.06] text-xs font-bold">-15s</button>
+                        <button onClick={() => setActiveDrillTimer((v) => v + 15)} className="px-3 py-1.5 rounded-lg bg-[#15191F] border border-white/[0.06] text-xs font-bold">+15s</button>
+                        <button onClick={resetDrillTimer} className="w-8 h-8 rounded-lg bg-[#15191F] border border-white/[0.06] flex items-center justify-center" aria-label="Reiniciar cronômetro"><TimerReset className="w-4 h-4" /></button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setIsTimerRunning((v) => !v)} className={`min-h-14 px-6 rounded-2xl font-bold uppercase tracking-wider flex items-center gap-2 ${isTimerRunning ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'}`}>{isTimerRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current" />}{isTimerRunning ? 'Pausar' : 'Iniciar'}</button>
-                      <button onClick={resetDrillTimer} className="w-14 h-14 rounded-2xl bg-[#15191F] border border-[#2B3542] flex items-center justify-center" aria-label="Reiniciar cronômetro"><TimerReset className="w-5 h-5" /></button>
-                    </div>
+                    <button onClick={() => setIsTimerRunning((v) => !v)} className={`w-full sm:w-auto min-h-16 sm:min-h-14 px-7 rounded-2xl font-black uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] ${isTimerRunning ? 'bg-amber-400 text-black' : 'bg-emerald-400 text-black'}`}>{isTimerRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 fill-current" />}{isTimerRunning ? 'Pausar' : activeDrillTimer === 0 ? 'Reiniciar' : 'Iniciar timer'}</button>
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="p-4 rounded-2xl bg-[#11151A] border border-[#1F2630]">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#FF6B1A]">Execução</span>
-                    <p className="text-sm text-white leading-relaxed mt-1.5">{exercise.instructions?.[0] || 'Execute com controle, postura e intenção de jogo.'}</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-[#11151A] border border-[#1F2630]">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" />Ponto-chave</span>
-                    <p className="text-sm text-[#D7DBE0] leading-relaxed mt-1.5">{exercise.tips?.[0] || 'Mantenha qualidade antes de aumentar velocidade.'}</p>
-                  </div>
+                <div className="grid grid-cols-2 gap-px bg-white/[0.06] border-y border-white/[0.06]">
+                  <div className="bg-[#080A0D] py-3 pr-4"><span className="text-[9px] uppercase text-[#737D88] block">Meta</span><strong className="text-sm sm:text-base text-white">{currentItem.customReps || exercise.reps || 'Qualidade máxima'}</strong></div>
+                  <div className="bg-[#080A0D] py-3 pl-4"><span className="text-[9px] uppercase text-[#737D88] block">Progresso</span><strong className="text-sm sm:text-base text-white">{completedSets}/{totalPlannedSets} séries</strong></div>
                 </div>
 
-                <CourtDiagram placement={exercise.courtPlacement || 'top'} className="max-h-44 sm:max-h-52" />
-              </section>
-
-              <aside className="space-y-3">
                 {(videoEmbedUrl || exercise.videoUrl) && (
-                  <button onClick={openVideoDemo} className="w-full p-4 rounded-2xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/30 text-left hover:bg-[#FF6B1A]/15 transition-colors">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#FF8D4D] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração</span>
-                    <span className="text-sm font-bold text-white block mt-1">Rever movimento</span>
-                    <span className="text-[11px] text-[#9AA1AA] block mt-1">O cronômetro pausa enquanto você assiste.</span>
+                  <button onClick={openVideoDemo} className="min-h-12 px-4 rounded-xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/25 text-[#FF8D4D] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                    <Video className="w-4 h-4" /> Ver demonstração
                   </button>
                 )}
 
-                <div className="p-4 rounded-2xl bg-[#0D1014] border border-[#1F2630]">
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985]">Meta da série</span>
-                  <div className="text-xl font-mono-num font-bold mt-1">{currentItem.customReps || exercise.reps || 'Qualidade máxima'}</div>
-                  <div className="text-xs text-[#9AA1AA] mt-2">Descanso programado: {restDuration}s</div>
-                </div>
+                {!shouldReduceDetails && (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div className="p-4 rounded-2xl bg-[#11151A] border border-white/[0.06]">
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-[#FF6B1A]">Execução</span>
+                        <p className="text-sm text-white leading-relaxed mt-1.5">{exercise.instructions?.[0] || 'Execute com controle, postura e intenção de jogo.'}</p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-[#11151A] border border-white/[0.06]">
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" />Ponto-chave</span>
+                        <p className="text-sm text-[#D7DBE0] leading-relaxed mt-1.5">{exercise.tips?.[0] || 'Mantenha qualidade antes de aumentar velocidade.'}</p>
+                      </div>
+                    </div>
+                    <CourtDiagram placement={exercise.courtPlacement || 'top'} className="max-h-44 sm:max-h-52" />
+                  </>
+                )}
+              </section>
 
-                <div className="p-4 rounded-2xl bg-[#0D1014] border border-[#1F2630]">
-                  <div className="flex items-center justify-between text-xs mb-2"><span className="font-bold text-white">Progresso</span><span className="font-mono-num text-[#FF6B1A]">{progressPercent}%</span></div>
-                  <div className="h-2 bg-[#15191F] rounded-full overflow-hidden"><div className="h-full bg-[#FF6B1A] rounded-full transition-all" style={{ width: `${progressPercent}%` }} /></div>
-                  <p className="text-[11px] text-[#707985] mt-2">{completedSets} de {totalPlannedSets} séries concluídas</p>
-                </div>
+              {!shouldReduceDetails && (
+                <aside className="space-y-3">
+                  <div className="p-4 border-y border-white/[0.06]">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985]">Meta da série</span>
+                    <div className="text-xl font-mono-num font-bold mt-1">{currentItem.customReps || exercise.reps || 'Qualidade máxima'}</div>
+                    <div className="text-xs text-[#9AA1AA] mt-2">Descanso programado: {restDuration}s</div>
+                  </div>
 
-                <div className="hidden lg:block p-4 rounded-2xl bg-[#0D1014] border border-[#1F2630]">
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985]">Tempo de sessão</span>
-                  <div className="text-2xl font-mono-num font-bold mt-1">{formatTime(totalSecondsElapsed)}</div>
-                </div>
-              </aside>
+                  <div className="p-4 border-b border-white/[0.06]">
+                    <div className="flex items-center justify-between text-xs mb-2"><span className="font-bold text-white">Progresso</span><span className="font-mono-num text-[#FF6B1A]">{progressPercent}%</span></div>
+                    <div className="h-2 bg-[#15191F] rounded-full overflow-hidden"><div className="h-full bg-[#FF6B1A] rounded-full transition-all" style={{ width: `${progressPercent}%` }} /></div>
+                    <p className="text-[11px] text-[#707985] mt-2">{completedSets} de {totalPlannedSets} séries concluídas</p>
+                  </div>
+
+                  <div className="hidden lg:block p-4">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985]">Tempo de sessão</span>
+                    <div className="text-2xl font-mono-num font-bold mt-1">{formatTime(totalSecondsElapsed)}</div>
+                  </div>
+                </aside>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      <footer className="flex-shrink-0 bg-[#0B0E12]/98 border-t border-[#1F2630] pb-[env(safe-area-inset-bottom)]">
+      <footer className="flex-shrink-0 bg-[#0B0E12]/98 border-t border-white/[0.06] pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-5xl mx-auto px-3 sm:px-5 py-3 flex items-center gap-2 sm:gap-3">
-          <button onClick={handlePrevExercise} disabled={currentExerciseIndex === 0 || isResting} className="w-12 sm:w-14 h-14 rounded-2xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center disabled:opacity-25" aria-label="Exercício anterior"><ChevronLeft className="w-6 h-6" /></button>
-          <button onClick={handleCompleteSet} disabled={isResting} className="flex-1 min-h-14 sm:min-h-16 rounded-2xl bg-[#FF6B1A] hover:bg-[#FF7A2E] disabled:opacity-40 font-heading text-base sm:text-lg uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B1A]/20 active:scale-[0.99]"><CheckCircle2 className="w-5 h-5" />{currentSet < targetSets ? 'Concluir série' : currentExerciseIndex < totalExercises - 1 ? 'Concluir exercício' : 'Finalizar treino'}</button>
-          <button onClick={handleNextExercise} disabled={isResting} className="w-12 sm:w-14 h-14 rounded-2xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center disabled:opacity-25" aria-label="Próximo exercício"><ChevronRight className="w-6 h-6" /></button>
+          <button onClick={handlePrevExercise} disabled={currentExerciseIndex === 0 || isResting} className="hidden sm:flex w-14 h-14 rounded-2xl bg-[#15191F] border border-white/[0.06] items-center justify-center disabled:opacity-25" aria-label="Exercício anterior"><ChevronLeft className="w-6 h-6" /></button>
+          <button onClick={handleCompleteSet} className={`flex-1 min-h-16 sm:min-h-16 rounded-2xl font-heading text-base sm:text-lg uppercase tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] ${isResting ? 'bg-emerald-400 text-black' : 'bg-[#FF6B1A] hover:bg-[#FF7A2E] text-white shadow-lg shadow-[#FF6B1A]/20'}`}>{isResting ? <Play className="w-5 h-5 fill-current" /> : <CheckCircle2 className="w-5 h-5" />}{footerLabel}</button>
+          <button onClick={handleNextExercise} disabled={isResting} className="hidden sm:flex w-14 h-14 rounded-2xl bg-[#15191F] border border-white/[0.06] items-center justify-center disabled:opacity-25" aria-label="Próximo exercício"><ChevronRight className="w-6 h-6" /></button>
         </div>
       </footer>
 
       {showVideo && (
         <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5" role="dialog" aria-modal="true" aria-label={`Demonstração de ${exercise.name}`}>
           <div className="w-full max-w-3xl max-h-[94dvh] sm:max-h-[92vh] rounded-t-[28px] sm:rounded-3xl bg-[#0D1014] border border-[#2B3542] overflow-y-auto overscroll-contain shadow-2xl pb-[env(safe-area-inset-bottom)]">
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-5 border-b border-[#1F2630] bg-[#0D1014]/95 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-5 bg-[#0D1014]/95 backdrop-blur-xl border-b border-[#1F2630]">
               <div className="min-w-0">
-                <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-[#FF6B1A] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração</span>
-                <h3 className="text-lg sm:text-xl font-heading mt-1 line-clamp-2">{exercise.name}</h3>
-                <p className="text-xs text-[#9AA1AA] mt-1">Assista ao movimento e volte para a série sem sair do treino.</p>
+                <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-[#FF6B1A]">Demonstração técnica</span>
+                <h3 className="text-lg sm:text-xl font-heading text-white truncate">{exercise.name}</h3>
               </div>
-              <button onClick={closeVideoDemo} className="w-11 h-11 rounded-xl bg-[#15191F] border border-[#1F2630] flex-shrink-0 flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Fechar demonstração"><X className="w-5 h-5" /></button>
+              <button onClick={closeVideoDemo} className="w-10 h-10 rounded-xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center text-[#9AA1AA] hover:text-white shrink-0" aria-label="Fechar vídeo"><X className="w-5 h-5" /></button>
             </div>
 
-            {videoEmbedUrl ? (
-              <div className="aspect-video bg-black">
-                <iframe
-                  className="w-full h-full"
-                  src={videoEmbedUrl}
-                  title={`Demonstração de ${exercise.name}`}
-                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            ) : (
-              <div className="p-8 text-center">
-                <Video className="w-9 h-9 text-[#707985] mx-auto" />
-                <p className="text-sm text-[#9AA1AA] mt-3">A demonstração não pode ser incorporada neste navegador.</p>
-              </div>
-            )}
+            <div className="p-3 sm:p-5">
+              {videoEmbedUrl ? (
+                <div className="aspect-video rounded-2xl overflow-hidden bg-black border border-[#1F2630]">
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`Demonstração de ${exercise.name}`}
+                    className="w-full h-full"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-[#2B3542] bg-[#11151A] p-6 text-center">
+                  <Video className="w-8 h-8 text-[#FF6B1A] mx-auto mb-2" />
+                  <p className="text-sm text-white font-bold">A demonstração abre no YouTube.</p>
+                </div>
+              )}
+            </div>
 
             <div className="p-4 sm:p-5 space-y-4">
               <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-4">
@@ -528,7 +572,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
 
               {videoSource?.source && (
                 <div className="flex items-start gap-3 px-1">
-                  <div className="w-8 h-8 rounded-lg bg-[#15191F] border border-[#1F2630] flex items-center justify-center flex-shrink-0"><Video className="w-4 h-4 text-[#FF8D4D]" /></div>
+                  <div className="w-8 h-8 rounded-lg bg-[#15191F] border border-[#1F2630] flex items-center justify-center shrink-0"><Video className="w-4 h-4 text-[#FF8D4D]" /></div>
                   <div className="min-w-0">
                     <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985] block">Fonte do vídeo</span>
                     <span className="text-xs sm:text-sm text-[#D7DBE0] leading-relaxed block mt-0.5">{videoSource.source}</span>
