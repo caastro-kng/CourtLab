@@ -21,21 +21,50 @@
     --cl-radius-sm: 12px;
     --cl-radius: 16px;
     --cl-radius-lg: 24px;
+
+    /* Typography scale */
+    --cl-type-page: clamp(2.25rem, 5vw, 4.75rem);
+    --cl-type-hero: clamp(2.75rem, 7vw, 6.25rem);
+    --cl-type-section: clamp(1.45rem, 2.5vw, 2.1rem);
+    --cl-type-card: clamp(1rem, 1.2vw, 1.2rem);
+    --cl-type-metric: clamp(1.65rem, 3vw, 2.65rem);
+    --cl-type-timer: clamp(4.25rem, 13vw, 8.75rem);
+    --cl-type-body: 0.875rem;
+    --cl-type-small: 0.75rem;
+    --cl-type-label: 0.625rem;
   }
 
   html {
     background: var(--cl-bg);
+    text-rendering: optimizeLegibility;
   }
 
   body {
     font-family: var(--font-body);
     background-color: var(--cl-bg);
     color: var(--cl-text);
+    font-size: var(--cl-type-body);
+    line-height: 1.55;
+    font-weight: 400;
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.028em;
+    text-wrap: balance;
+  }
+
+  h1 { line-height: 0.94; }
+  h2 { line-height: 1; }
+  h3, h4 { line-height: 1.08; }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  strong,
+  b {
+    font-weight: 700;
   }
 
   button,
@@ -65,20 +94,117 @@
 }
 
 .font-bebas {
-  font-family: 'Bebas Neue', sans-serif;
-  letter-spacing: 0.05em;
+  font-family: var(--font-display);
+  letter-spacing: 0.045em;
 }
 
 .font-heading {
-  font-family: 'Archivo Black', 'Archivo', sans-serif;
+  font-family: var(--font-heading);
+  letter-spacing: -0.028em;
 }
 
 .font-body {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-body);
 }
 
 .font-mono-num {
-  font-family: 'Space Grotesk', monospace;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.035em;
+}
+
+/* Semantic typography primitives. Prefer these over ad-hoc size/weight combinations. */
+.cl-eyebrow,
+.cl-label {
+  font-family: var(--font-body);
+  font-size: var(--cl-type-label);
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cl-eyebrow {
+  color: var(--cl-orange);
+  letter-spacing: 0.2em;
+}
+
+.cl-label {
+  color: #78838F;
+}
+
+.cl-page-title {
+  font-family: var(--font-heading);
+  font-size: var(--cl-type-page);
+  line-height: 0.94;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+
+.cl-hero-title {
+  font-family: var(--font-heading);
+  font-size: var(--cl-type-hero);
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.cl-section-title {
+  font-family: var(--font-heading);
+  font-size: var(--cl-type-section);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.cl-card-title {
+  font-family: var(--font-heading);
+  font-size: var(--cl-type-card);
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+}
+
+.cl-copy {
+  font-family: var(--font-body);
+  font-size: var(--cl-type-body);
+  line-height: 1.58;
+  font-weight: 400;
+  color: var(--cl-muted);
+}
+
+.cl-copy-small {
+  font-family: var(--font-body);
+  font-size: var(--cl-type-small);
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--cl-muted);
+}
+
+.cl-metric {
+  font-family: var(--font-mono);
+  font-size: var(--cl-type-metric);
+  line-height: 0.95;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.055em;
+}
+
+.cl-timer {
+  font-family: var(--font-mono);
+  font-size: var(--cl-type-timer);
+  line-height: 0.84;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.07em;
+}
+
+.cl-button-text {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* CourtLab visual primitives: use one strong surface per section and dividers inside it. */
@@ -213,6 +339,20 @@ main [data-cl-flat-group] > [data-cl-flat-item] + [data-cl-flat-item] {
     linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
   background-size: 100% 100%, 48px 48px, 48px 48px;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 0.84rem;
+  }
+
+  .cl-copy {
+    line-height: 1.52;
+  }
+
+  .cl-button-text {
+    letter-spacing: 0.065em;
+  }
 }
 
 @media (hover: none) {
