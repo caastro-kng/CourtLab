@@ -85,6 +85,11 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=3hRXONs0B8E',
     source: 'Dr. Dish Basketball — Pick & Roll Progression with Skylar Diggins-Smith'
   },
+  'pnr-02': {
+    youtubeId: 'O_9Eoq4be7o',
+    videoUrl: 'https://www.youtube.com/watch?v=O_9Eoq4be7o',
+    source: 'Detailed Game — Pick & Roll: Snake Dribble Move'
+  },
   'ps-01': {
     youtubeId: 'akNbK7X_EsM',
     videoUrl: 'https://www.youtube.com/watch?v=akNbK7X_EsM',
