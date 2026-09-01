@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award,
+  Camera,
   Check,
   ChevronRight,
   Clock3,
@@ -9,14 +11,20 @@ import {
   Edit2,
   Flame,
   MapPin,
+  LoaderCircle,
+  LogOut,
   Save,
   ShieldCheck,
   Target,
+  Trash2,
   X,
   Zap
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { useAuth } from '../context/AuthContext';
 import { DifficultyLevel, PlayerPosition } from '../types';
+import { supabase } from '../lib/supabase';
+import { AthleteAvatar } from '../components/profile/AthleteAvatar';
 
 const POSITION_OPTIONS: PlayerPosition[] = ['PG','SG','SF','PF','C','SG / PG','SF / SG','PF / C'];
 const LEVEL_OPTIONS: DifficultyLevel[] = ['Iniciante','Intermediário','Avançado','Competitivo'];
@@ -31,7 +39,13 @@ const getPlayerRole = (position: PlayerPosition) => {
 
 export const Profile: React.FC = () => {
   const { profile, updateProfile, xp, tier, currentStreakDays, longestStreakDays, skillsRating, topStrength, mainFocusArea, workoutLogs } = usePlayer();
+  const { user, signOut } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileMessage, setProfileMessage] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({ name: profile.name, age: profile.age, height: profile.height, weight: profile.weight, position: profile.position, dominantHand: profile.dominantHand, level: profile.level, city: profile.city || '', bio: profile.bio || '', primaryGoals: profile.primaryGoals || [] });
 
   const nextTierXp = tier === 'Rookie' ? 600 : tier === 'Prospect' ? 1200 : tier === 'Starter' ? 1800 : tier === 'Sixth Man' ? 2500 : tier === 'All-Star' ? 3500 : 3500;
@@ -48,13 +62,108 @@ export const Profile: React.FC = () => {
   const initials = profile.name.split(' ').filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('') || 'CL';
 
   const resetForm = () => setFormData({ name: profile.name, age: profile.age, height: profile.height, weight: profile.weight, position: profile.position, dominantHand: profile.dominantHand, level: profile.level, city: profile.city || '', bio: profile.bio || '', primaryGoals: profile.primaryGoals || [] });
-  const handleSave = (event: React.FormEvent) => {
+  const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
-    updateProfile({ ...formData, name: formData.name.trim() || profile.name, age: Number(formData.age), height: formData.height.trim(), weight: formData.weight.trim(), city: formData.city.trim(), bio: formData.bio.trim() });
+    setProfileError('');
+    setProfileMessage('');
+    const result = await updateProfile({ ...formData, name: formData.name.trim() || profile.name, age: Number(formData.age), height: formData.height.trim(), weight: formData.weight.trim(), city: formData.city.trim(), bio: formData.bio.trim() });
+    if (result.error) {
+      setProfileError(result.error);
+      return;
+    }
     setIsEditing(false);
+    setProfileMessage('Perfil atualizado com sucesso.');
   };
   const cancel = () => { resetForm(); setIsEditing(false); };
   const toggleGoal = (goal: string) => setFormData((prev) => ({ ...prev, primaryGoals: prev.primaryGoals.includes(goal) ? prev.primaryGoals.filter((item) => item !== goal) : [...prev.primaryGoals, goal].slice(0, 5) }));
+
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setProfileError('');
+    setProfileMessage('');
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setProfileError('Escolha uma imagem JPG, PNG ou WebP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileError('A foto deve ter no máximo 2 MB.');
+      return;
+    }
+    if (!user || !supabase) {
+      setProfileError('Sua sessão não está disponível. Entre novamente e tente outra vez.');
+      return;
+    }
+
+    setPhotoUploading(true);
+    const avatarPath = `${user.id}/avatar`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(avatarPath, file, {
+        cacheControl: '3600',
+        contentType: file.type,
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('CourtLab avatar upload failed:', uploadError.message);
+      setProfileError('Não foi possível enviar a foto. Tente novamente.');
+      setPhotoUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(avatarPath);
+    const result = await updateProfile({ avatarUrl: `${data.publicUrl}?v=${Date.now()}` });
+    setPhotoUploading(false);
+
+    if (result.error) {
+      setProfileError(result.error);
+      return;
+    }
+    setProfileMessage('Foto de perfil atualizada.');
+  };
+
+  const handleLogout = async () => {
+    setProfileError('');
+    setProfileMessage('');
+    setLogoutLoading(true);
+    const result = await signOut();
+    if (result.error) {
+      setProfileError(result.error);
+      setLogoutLoading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!user || !supabase) {
+      setProfileError('Sua sessão não está disponível. Entre novamente e tente outra vez.');
+      return;
+    }
+
+    setProfileError('');
+    setProfileMessage('');
+    setPhotoUploading(true);
+    const avatarPath = `${user.id}/avatar`;
+    const { error: removeError } = await supabase.storage.from('avatars').remove([avatarPath]);
+
+    if (removeError) {
+      console.error('CourtLab avatar removal failed:', removeError.message);
+      setProfileError('Não foi possível remover a foto. Tente novamente.');
+      setPhotoUploading(false);
+      return;
+    }
+
+    const result = await updateProfile({ avatarUrl: undefined });
+    setPhotoUploading(false);
+    if (result.error) {
+      setProfileError(result.error);
+      return;
+    }
+    setProfileMessage('Foto de perfil removida.');
+  };
 
   return <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-8 cl-view-enter">
     <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-white/[0.06]">
@@ -66,6 +175,9 @@ export const Profile: React.FC = () => {
       {!isEditing && <button onClick={() => setIsEditing(true)} className="min-h-11 px-4 rounded-xl border border-white/[0.08] hover:border-white/[0.16] text-white cl-button-text flex items-center justify-center gap-2"><Edit2 className="w-4 h-4 text-[#FF6B1A]" />Editar perfil</button>}
     </header>
 
+    {profileMessage && <div role="status" aria-live="polite" className="p-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.06] text-sm text-emerald-300">{profileMessage}</div>}
+    {profileError && <div role="alert" aria-live="assertive" className="p-4 rounded-2xl border border-red-400/25 bg-red-400/[0.06] text-sm text-red-300">{profileError}</div>}
+
     <section className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0B0F14] min-h-[360px]">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -right-10 -top-16 text-[220px] sm:text-[300px] font-heading leading-none text-white/[0.018] select-none">{initials}</div>
@@ -76,8 +188,36 @@ export const Profile: React.FC = () => {
       <div className="relative z-10 p-6 sm:p-8 lg:p-10 min-h-[360px] flex flex-col justify-between gap-10">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
           <div className="flex flex-col sm:flex-row gap-5 sm:items-center min-w-0">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[26px] border border-[#FF6B1A]/45 bg-[#FF6B1A]/10 flex items-center justify-center shrink-0 shadow-[0_20px_60px_rgba(255,107,26,0.08)]">
-              <span className="text-4xl sm:text-5xl font-heading text-white">{initials}</span>
+            <div className="relative shrink-0 group">
+              <AthleteAvatar
+                name={profile.name}
+                src={profile.avatarUrl}
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-[26px] border border-[#FF6B1A]/45 bg-[#FF6B1A]/10 shadow-[0_20px_60px_rgba(255,107,26,0.08)]"
+                fallbackClassName="text-4xl sm:text-5xl font-heading text-white"
+              />
+              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} className="sr-only" />
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoUploading}
+                className="absolute -right-2 -bottom-2 w-10 h-10 rounded-xl bg-[#FF6B1A] border-4 border-[#0B0F14] text-white flex items-center justify-center shadow-lg hover:bg-[#FF7A2E] disabled:opacity-60"
+                aria-label={profile.avatarUrl ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'}
+                title={profile.avatarUrl ? 'Trocar foto' : 'Adicionar foto'}
+              >
+                {photoUploading ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              </button>
+              {profile.avatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  disabled={photoUploading}
+                  className="absolute -left-2 -bottom-2 w-10 h-10 rounded-xl bg-[#171C22] border-4 border-[#0B0F14] text-[#9AA1AA] flex items-center justify-center shadow-lg hover:text-red-300 disabled:opacity-60"
+                  aria-label="Remover foto de perfil"
+                  title="Remover foto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -90,7 +230,7 @@ export const Profile: React.FC = () => {
                 {profile.city && <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#FF6B1A]" />{profile.city}</span>}
                 <span>Posição <b className="text-white font-semibold">{profile.position}</b></span>
                 <span>Mão <b className="text-white font-semibold">{profile.dominantHand}</b></span>
-                <span>{profile.height} · {profile.weight} · {profile.age} anos</span>
+                <span>{profile.height ? `${profile.height} · ` : ''}{profile.age} anos</span>
               </div>
             </div>
           </div>
@@ -119,7 +259,8 @@ export const Profile: React.FC = () => {
         <button type="button" onClick={cancel} className="w-11 h-11 rounded-xl border border-white/[0.08] flex items-center justify-center" aria-label="Fechar edição"><X className="w-5 h-5 text-[#9AA1AA]" /></button>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {([['Nome','name'],['Altura','height'],['Peso','weight'],['Cidade','city']] as const).map(([label,key]) => <label key={key}><span className="cl-label text-[#8F98A4]">{label}</span><input value={String(formData[key])} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white" /></label>)}
+        {([['Nome','name'],['Altura','height'],['Cidade','city']] as const).map(([label,key]) => <label key={key}><span className="cl-label text-[#8F98A4]">{label}</span><input value={String(formData[key])} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white" /></label>)}
+        <label><span className="cl-label text-[#8F98A4]">Peso <span className="normal-case tracking-normal text-[#626D79]">(privado)</span></span><input value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white" /></label>
         <label><span className="cl-label text-[#8F98A4]">Idade</span><input type="number" value={formData.age} onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white" /></label>
         <label><span className="cl-label text-[#8F98A4]">Posição</span><select value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value as PlayerPosition })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white">{POSITION_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
         <label><span className="cl-label text-[#8F98A4]">Mão</span><select value={formData.dominantHand} onChange={(e) => setFormData({ ...formData, dominantHand: e.target.value as typeof formData.dominantHand })} className="w-full mt-1 px-3 py-3 bg-[#11161C] border border-white/[0.07] rounded-xl text-white">{HAND_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
@@ -171,6 +312,23 @@ export const Profile: React.FC = () => {
         <div className="flex justify-between cl-copy-small mt-2 max-w-3xl"><span>{tier === 'Elite' ? 'Nível máximo atual' : `${tierProgress}% deste nível`}</span><span>{tier === 'Elite' ? 'Elite' : `Próximo: ${nextTierXp} XP`}</span></div>
       </div>
       <div className="flex items-center gap-2 text-xs text-[#8F98A4]"><Flame className="w-4 h-4 text-[#FF6B1A]" /><span>Maior sequência: <b className="text-white">{longestStreakDays} dias</b></span></div>
+    </section>
+
+    <section className="pt-7 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <span className="cl-eyebrow text-[#737D88]">Conta e acesso</span>
+        <h3 className="text-lg font-heading text-white mt-1">ENCERRAR SESSÃO</h3>
+        <p className="cl-copy-small mt-1">Seus dados permanecem salvos para o próximo acesso.</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={logoutLoading}
+        className="min-h-11 px-5 rounded-xl border border-red-400/25 bg-red-400/[0.06] hover:bg-red-400/[0.1] text-red-300 cl-button-text flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        {logoutLoading ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+        {logoutLoading ? 'Saindo...' : 'Sair da conta'}
+      </button>
     </section>
   </div>;
 };

@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase';
 
 interface PlayerContextType {
   profile: PlayerProfile;
-  updateProfile: (updated: Partial<PlayerProfile>) => void;
+  updateProfile: (updated: Partial<PlayerProfile>) => Promise<{ error?: string }>;
   skillsRating: SkillRating[];
   updateSkillRating: (key: string, newScore: number) => void;
   topStrength: { name: string; score: number };
@@ -61,6 +61,7 @@ type ProfileRow = {
   city: string | null;
   bio: string | null;
   primary_goals: string[] | null;
+  avatar_url: string | null;
 };
 
 type PlayerStatePayload = {
@@ -105,7 +106,8 @@ const profileFromRow = (row: ProfileRow, fallback: PlayerProfile): PlayerProfile
   level: (row.level as PlayerProfile['level']) || fallback.level,
   city: row.city ?? fallback.city,
   bio: row.bio ?? fallback.bio,
-  primaryGoals: Array.isArray(row.primary_goals) ? row.primary_goals : fallback.primaryGoals
+  primaryGoals: Array.isArray(row.primary_goals) ? row.primary_goals : fallback.primaryGoals,
+  avatarUrl: row.avatar_url ?? fallback.avatarUrl
 });
 
 const profileToRow = (id: string, profile: PlayerProfile) => ({
@@ -119,7 +121,8 @@ const profileToRow = (id: string, profile: PlayerProfile) => ({
   level: profile.level,
   city: profile.city || '',
   bio: profile.bio || '',
-  primary_goals: profile.primaryGoals
+  primary_goals: profile.primaryGoals,
+  avatar_url: profile.avatarUrl || null
 });
 
 const INITIAL_SKILLS: SkillRating[] = [
@@ -199,7 +202,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const hydrateProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id,name,age,height,weight,position,dominant_hand,level,city,bio,primary_goals')
+        .select('id,name,age,height,weight,position,dominant_hand,level,city,bio,primary_goals,avatar_url')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -370,25 +373,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [workoutLogs, customWorkouts]
   );
 
-  const updateProfile = (updated: Partial<PlayerProfile>) => {
-    setProfile((previous) => {
-      const next = { ...previous, ...updated };
+  const updateProfile = async (updated: Partial<PlayerProfile>) => {
+    const previous = profile;
+    const next = { ...previous, ...updated };
+    setProfile(next);
 
-      if (user && supabase) {
-        void supabase
-          .from('profiles')
-          .upsert(profileToRow(user.id, next), { onConflict: 'id' })
-          .then(({ error }) => {
-            if (error) console.error('CourtLab profile save failed:', error.message);
-          });
+    if (!user || !supabase) return {};
 
-        if (updated.name && updated.name !== previous.name) {
-          void supabase.auth.updateUser({ data: { ...user.user_metadata, name: next.name } });
-        }
-      }
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(profileToRow(user.id, next), { onConflict: 'id' });
 
-      return next;
-    });
+    if (error) {
+      console.error('CourtLab profile save failed:', error.message);
+      setProfile(previous);
+      return { error: 'Não foi possível salvar o perfil. Tente novamente.' };
+    }
+
+    if (updated.name && updated.name !== previous.name) {
+      const { error: authError } = await supabase.auth.updateUser({ data: { ...user.user_metadata, name: next.name } });
+      if (authError) console.error('CourtLab auth name save failed:', authError.message);
+    }
+
+    return {};
   };
 
   const updateSkillRating = (key: string, newScore: number) => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, Flame, Award } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Link } from 'react-router-dom';
+import { AthleteAvatar } from '../profile/AthleteAvatar';
 
 interface HeaderProps {
   onOpenSearch: () => void;
@@ -81,9 +82,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
             <span className="text-[11px] font-bold text-white block leading-tight">{profile.name}</span>
             <span className="text-[9px] text-[#7F8894] leading-none">{profile.position}</span>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-[#171C22] border border-[#2B3542] flex items-center justify-center text-xs font-bold text-white">
-            {profile.name.charAt(0)}
-          </div>
+          <AthleteAvatar
+            name={profile.name}
+            src={profile.avatarUrl}
+            className="w-8 h-8 rounded-lg bg-[#171C22] border border-[#2B3542]"
+            fallbackClassName="text-xs font-bold text-white"
+          />
         </Link>
       </div>
     </header>
