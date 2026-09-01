@@ -55,6 +55,26 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=I3ciH34vjEY',
     source: 'ShotMechanics — How to: Step Back Basketball Move'
   },
+  'sh-05': {
+    youtubeId: '8ubuMfItS2M',
+    videoUrl: 'https://www.youtube.com/watch?v=8ubuMfItS2M',
+    source: 'Shoot-A-Way — University of Florida Gators Sprint To Corner 3s Shooting Drill'
+  },
+  'sh-06': {
+    youtubeId: '5kNcR05RuPE',
+    videoUrl: 'https://www.youtube.com/watch?v=5kNcR05RuPE',
+    source: 'Coach Frikki — BEST Separation Move: Side Step Tutorial'
+  },
+  'sh-07': {
+    youtubeId: 'Yr1OWS_Zsgw',
+    videoUrl: 'https://www.youtube.com/watch?v=Yr1OWS_Zsgw',
+    source: 'SeeMikeDunn — How To Shoot A Basketball: Free Throw Routine'
+  },
+  'sh-08': {
+    youtubeId: 'hPNq3nKI-mI',
+    videoUrl: 'https://www.youtube.com/watch?v=hPNq3nKI-mI',
+    source: 'Pro Training Basketball — Down Screen Shooting Drill'
+  },
   'fn-01': {
     youtubeId: 'Q1LiWKc8-Ls',
     videoUrl: 'https://www.youtube.com/watch?v=Q1LiWKc8-Ls',
