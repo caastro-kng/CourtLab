@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowRight, Clock, MapPin, Video } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Clock, ImageOff, MapPin, Video } from 'lucide-react';
 import { Exercise } from '../../types';
 import { EXERCISE_VIDEO_SOURCES } from '../../data/exerciseVideos';
 import { getCategoryVisual } from '../../utils/categoryVisual';
@@ -13,6 +13,7 @@ interface ExerciseCardProps {
 export const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onSelect, compact = false }) => {
   const videoSource = EXERCISE_VIDEO_SOURCES[exercise.id];
   const visual = getCategoryVisual(exercise.category);
+  const [imageFailed, setImageFailed] = useState(false);
 
   return <button
     type="button"
@@ -21,22 +22,43 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onSelect, 
     aria-label={`Abrir exercício ${exercise.name}`}
   >
     <span className="absolute inset-x-0 top-0 h-[2px] z-20" style={{ backgroundColor: visual.accent }} />
-    <div className={`relative ${compact ? 'h-28' : 'h-44'} overflow-hidden bg-[#090C10]`}>
-      <img src={exercise.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover opacity-78 brightness-75 saturate-75 group-hover:scale-[1.035] transition-transform duration-500" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0D1116] via-black/10 to-black/15" />
-      <div className="absolute inset-x-0 bottom-0 h-20 opacity-70 group-hover:opacity-95 transition-opacity pointer-events-none" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
+
+    <div className="relative aspect-video w-full overflow-hidden bg-[#090C10] isolate">
+      {!imageFailed ? (
+        <img
+          src={exercise.thumbnail}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-[0.82] brightness-[0.72] saturate-[0.68] contrast-[1.08] group-hover:scale-[1.035] group-hover:brightness-[0.76] group-hover:saturate-[0.76] transition-[transform,filter,opacity] duration-500 ease-out"
+        />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-5" style={{ background: `radial-gradient(circle at 50% 35%, ${visual.glow}, transparent 58%), #090C10` }}>
+          <div className="w-11 h-11 rounded-2xl border border-white/[0.08] bg-white/[0.035] flex items-center justify-center">
+            <ImageOff className="w-5 h-5" style={{ color: visual.accent }} />
+          </div>
+          <span className="cl-label text-white/55">Imagem indisponível</span>
+        </div>
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-[#0D1116]/95 pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-[46%] opacity-70 group-hover:opacity-95 transition-opacity pointer-events-none" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
+      <div className="absolute inset-0 ring-1 ring-inset ring-white/[0.035] pointer-events-none" />
 
       <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 cl-label text-white bg-black/55 backdrop-blur-sm px-2.5 py-1 rounded-full">
+        <span className="inline-flex items-center gap-1.5 cl-label text-white bg-black/55 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/[0.06]">
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: visual.accent }} />
           {exercise.categoryLabel}
         </span>
-        {videoSource && <span className="w-8 h-8 rounded-full bg-[#FF6B1A] text-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform" title="Vídeo disponível"><Video className="w-3.5 h-3.5" /></span>}
+        {videoSource && <span className="w-8 h-8 rounded-full bg-[#FF6B1A] text-white flex items-center justify-center shadow-lg shadow-black/25 group-hover:scale-105 transition-transform" title="Vídeo disponível"><Video className="w-3.5 h-3.5" /></span>}
       </div>
-      <div className="absolute bottom-3 left-3 right-3 flex items-center gap-3 cl-copy-small text-white/85">
+
+      <div className={`absolute bottom-3 left-3 right-3 flex items-center gap-3 cl-copy-small text-white/90 ${compact ? 'text-[10px]' : ''}`}>
         <span className="flex items-center gap-1 font-mono-num"><Clock className="w-3.5 h-3.5 text-[#FF8D4D]" />{exercise.durationMinutes} min</span>
         <span className="flex items-center gap-1 min-w-0"><MapPin className="w-3.5 h-3.5 text-[#FF8D4D]" /><span className="truncate">{exercise.space}</span></span>
-        <span className="ml-auto cl-label text-white/70">{exercise.difficulty}</span>
+        <span className="ml-auto cl-label text-white/72">{exercise.difficulty}</span>
       </div>
     </div>
 
