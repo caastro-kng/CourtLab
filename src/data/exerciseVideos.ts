@@ -25,6 +25,11 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=Ze9QKvjZxYQ',
     source: 'ILoveBasketballTV — How to Dribble a Basketball BEHIND YOUR BACK'
   },
+  'bh-04': {
+    youtubeId: '6nfnBHvDkRk',
+    videoUrl: 'https://www.youtube.com/watch?v=6nfnBHvDkRk',
+    source: 'Jr. NBA Jr. WNBA — Stationary 2-Ball Dribble Drill (Same Time)'
+  },
   'bh-05': {
     youtubeId: 'b73g2s6HpC4',
     videoUrl: 'https://www.youtube.com/watch?v=b73g2s6HpC4',
@@ -34,6 +39,16 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     youtubeId: 'wkusPZJKkis',
     videoUrl: 'https://www.youtube.com/watch?v=wkusPZJKkis',
     source: 'Teach Hoops — Tennis Ball Dribble Drill'
+  },
+  'bh-07': {
+    youtubeId: 'JWPvIxiv9q0',
+    videoUrl: 'https://www.youtube.com/watch?v=JWPvIxiv9q0',
+    source: 'ILoveBasketballTV — Fix Your OFF-HAND Dribble In Basketball'
+  },
+  'bh-08': {
+    youtubeId: 'Pz0HP1Ly27c',
+    videoUrl: 'https://www.youtube.com/watch?v=Pz0HP1Ly27c',
+    source: 'Atlanta Hawks — Retreat Dribble (Advanced Dribble Move)'
   },
   'sh-01': {
     youtubeId: 'fttAr9-Yo9g',
