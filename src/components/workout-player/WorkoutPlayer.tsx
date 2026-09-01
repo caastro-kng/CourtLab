@@ -18,7 +18,9 @@ import {
   Trophy,
   TimerReset,
   Minus,
-  Plus
+  Plus,
+  Video,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Workout, Exercise } from '../../types';
@@ -45,6 +47,8 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [resumeTimerAfterVideo, setResumeTimerAfterVideo] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [perceivedDifficulty, setPerceivedDifficulty] = useState<Difficulty>('Bom');
   const [shotsLogged, setShotsLogged] = useState(0);
@@ -55,6 +59,22 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   const exercise: Exercise | undefined = currentItem ? getExerciseById(currentItem.exerciseId) : undefined;
   const targetSets = currentItem?.customSets || exercise?.sets || 3;
   const restDuration = currentItem?.restSeconds || 30;
+
+  const videoEmbedUrl = useMemo(() => {
+    if (!exercise) return null;
+    if (exercise.youtubeId) return `https://www.youtube-nocookie.com/embed/${exercise.youtubeId}`;
+    if (!exercise.videoUrl) return null;
+
+    try {
+      const url = new URL(exercise.videoUrl);
+      const videoId = url.hostname.includes('youtu.be')
+        ? url.pathname.replace('/', '')
+        : url.searchParams.get('v');
+      return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
+    } catch {
+      return null;
+    }
+  }, [exercise]);
 
   const totalPlannedSets = useMemo(
     () => workout.exercises.reduce((sum, item) => {
@@ -110,6 +130,11 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    setShowVideo(false);
+    setResumeTimerAfterVideo(false);
+  }, [currentExerciseIndex]);
+
   const playBeep = () => {
     if (isMuted) return;
     try {
@@ -133,9 +158,22 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     setActiveDrillTimer(45);
   };
 
+  const openVideoDemo = () => {
+    setResumeTimerAfterVideo(isTimerRunning);
+    setIsTimerRunning(false);
+    setShowVideo(true);
+  };
+
+  const closeVideoDemo = () => {
+    setShowVideo(false);
+    if (resumeTimerAfterVideo && activeDrillTimer > 0) setIsTimerRunning(true);
+    setResumeTimerAfterVideo(false);
+  };
+
   const triggerCelebration = () => {
     setIsTimerRunning(false);
     setIsResting(false);
+    setShowVideo(false);
     setIsCompleted(true);
     confetti({
       particleCount: 90,
@@ -149,6 +187,7 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     setCurrentExerciseIndex(nextIndex);
     setCurrentSet(1);
     setIsResting(false);
+    setShowVideo(false);
     resetDrillTimer();
   };
 
@@ -349,11 +388,17 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
           ) : (
             <div className="flex-1 grid lg:grid-cols-[1fr_300px] gap-5 lg:gap-7">
               <section className="flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-[#FF8D4D]">Exercício {currentExerciseIndex + 1} de {totalExercises}</span>
                     <h1 className="text-3xl sm:text-5xl font-heading leading-[0.95] mt-1">{exercise.name}</h1>
                     <p className="text-sm text-[#9AA1AA] mt-2">{exercise.categoryLabel} • {exercise.subcategory}</p>
+                    {(videoEmbedUrl || exercise.videoUrl) && (
+                      <button onClick={openVideoDemo} className="mt-3 min-h-10 px-4 rounded-xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/35 text-[#FF8D4D] hover:bg-[#FF6B1A]/15 font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                        <Video className="w-4 h-4" />
+                        Ver demonstração
+                      </button>
+                    )}
                   </div>
                   <div className="flex-shrink-0 text-right">
                     <span className="text-[9px] uppercase font-bold text-[#707985] block">Série</span>
@@ -393,6 +438,14 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
               </section>
 
               <aside className="space-y-3">
+                {(videoEmbedUrl || exercise.videoUrl) && (
+                  <button onClick={openVideoDemo} className="w-full p-4 rounded-2xl bg-[#FF6B1A]/10 border border-[#FF6B1A]/30 text-left hover:bg-[#FF6B1A]/15 transition-colors">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#FF8D4D] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração</span>
+                    <span className="text-sm font-bold text-white block mt-1">Rever movimento</span>
+                    <span className="text-[11px] text-[#9AA1AA] block mt-1">O cronômetro pausa enquanto você assiste.</span>
+                  </button>
+                )}
+
                 <div className="p-4 rounded-2xl bg-[#0D1014] border border-[#1F2630]">
                   <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985]">Meta da série</span>
                   <div className="text-xl font-mono-num font-bold mt-1">{currentItem.customReps || exercise.reps || 'Qualidade máxima'}</div>
@@ -422,6 +475,52 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
           <button onClick={handleNextExercise} disabled={isResting} className="w-12 sm:w-14 h-14 rounded-2xl bg-[#15191F] border border-[#1F2630] flex items-center justify-center disabled:opacity-25" aria-label="Próximo exercício"><ChevronRight className="w-6 h-6" /></button>
         </div>
       </footer>
+
+      {showVideo && (
+        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5" role="dialog" aria-modal="true" aria-label={`Demonstração de ${exercise.name}`}>
+          <div className="w-full max-w-3xl rounded-t-3xl sm:rounded-3xl bg-[#0D1014] border border-[#2B3542] overflow-hidden shadow-2xl">
+            <div className="flex items-start justify-between gap-4 p-4 sm:p-5 border-b border-[#1F2630]">
+              <div className="min-w-0">
+                <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-[#FF6B1A] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração</span>
+                <h3 className="text-lg sm:text-xl font-heading mt-1 truncate">{exercise.name}</h3>
+                <p className="text-xs text-[#9AA1AA] mt-1">Assista ao movimento e volte para a série sem sair do treino.</p>
+              </div>
+              <button onClick={closeVideoDemo} className="w-10 h-10 rounded-xl bg-[#15191F] border border-[#1F2630] flex-shrink-0 flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Fechar demonstração"><X className="w-5 h-5" /></button>
+            </div>
+
+            {videoEmbedUrl ? (
+              <div className="aspect-video bg-black">
+                <iframe
+                  className="w-full h-full"
+                  src={videoEmbedUrl}
+                  title={`Demonstração de ${exercise.name}`}
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <Video className="w-9 h-9 text-[#707985] mx-auto" />
+                <p className="text-sm text-[#9AA1AA] mt-3">A demonstração não pode ser incorporada neste navegador.</p>
+              </div>
+            )}
+
+            <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-xs text-[#9AA1AA]">
+                {resumeTimerAfterVideo ? 'O cronômetro foi pausado e volta ao fechar o vídeo.' : 'O cronômetro permanece pausado enquanto você assiste.'}
+              </div>
+              <div className="flex gap-2">
+                {exercise.videoUrl && (
+                  <a href={exercise.videoUrl} target="_blank" rel="noreferrer" className="min-h-11 px-4 rounded-xl bg-[#15191F] border border-[#2B3542] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <ExternalLink className="w-4 h-4" />Abrir no YouTube
+                  </a>
+                )}
+                <button onClick={closeVideoDemo} className="min-h-11 px-5 rounded-xl bg-[#FF6B1A] text-xs font-bold uppercase tracking-wider">Voltar ao treino</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showExitConfirm && (
         <div className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
