@@ -1,5 +1,5 @@
-import React from 'react';
-import { Clock, Flame, Dumbbell, Award, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Clock, Flame, Dumbbell, Award, ArrowRight, ImageOff } from 'lucide-react';
 import { Workout } from '../../types';
 import { getCategoryVisual } from '../../utils/categoryVisual';
 
@@ -11,6 +11,7 @@ interface WorkoutCardProps {
 
 export const WorkoutCard: React.FC<WorkoutCardProps> = ({ workout, onStart, featured = false }) => {
   const visual = getCategoryVisual(workout.category);
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <article
@@ -19,23 +20,37 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({ workout, onStart, feat
       } hover:border-white/[0.13] rounded-[20px] overflow-hidden transition-all duration-200 flex flex-col h-full`}
     >
       <span className="absolute inset-x-0 top-0 h-[2px] z-20" style={{ backgroundColor: visual.accent }} />
-      <div className="relative h-44 w-full overflow-hidden bg-[#0A0D11]">
-        <img
-          src={workout.thumbnail}
-          alt=""
-          className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 opacity-62 brightness-75 saturate-75"
-          referrerPolicy="no-referrer"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0F141A] via-[#0F141A]/28 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-20 opacity-65 group-hover:opacity-90 transition-opacity" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
+
+      <div className="relative aspect-video w-full overflow-hidden bg-[#0A0D11] isolate">
+        {!imageFailed ? (
+          <img
+            src={workout.thumbnail}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-[0.76] brightness-[0.7] saturate-[0.66] contrast-[1.08] group-hover:scale-[1.04] group-hover:brightness-[0.75] group-hover:saturate-[0.74] transition-[transform,filter,opacity] duration-500 ease-out"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-5" style={{ background: `radial-gradient(circle at 50% 35%, ${visual.glow}, transparent 58%), #0A0D11` }}>
+            <div className="w-11 h-11 rounded-2xl border border-white/[0.08] bg-white/[0.035] flex items-center justify-center">
+              <ImageOff className="w-5 h-5" style={{ color: visual.accent }} />
+            </div>
+            <span className="cl-label text-white/55">Imagem indisponível</span>
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-b from-black/28 via-transparent to-[#0F141A]/96 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-[46%] opacity-65 group-hover:opacity-90 transition-opacity pointer-events-none" style={{ background: `linear-gradient(to top, ${visual.glow}, transparent)` }} />
+        <div className="absolute inset-0 ring-1 ring-inset ring-white/[0.035] pointer-events-none" />
 
         <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full cl-label bg-black/55 text-white backdrop-blur-sm">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full cl-label bg-black/55 text-white backdrop-blur-md border border-white/[0.06]">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: visual.accent }} />
             {workout.categoryLabel}
           </span>
-          <span className="cl-label text-white/75 pt-1">{workout.level}</span>
+          <span className="cl-label text-white/78 pt-1 drop-shadow-sm">{workout.level}</span>
         </div>
       </div>
 
