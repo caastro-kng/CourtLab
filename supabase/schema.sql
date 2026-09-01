@@ -64,3 +64,33 @@ drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute procedure public.set_updated_at();
+
+create table if not exists public.player_state (
+  id uuid primary key references auth.users(id) on delete cascade,
+  state jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.player_state enable row level security;
+
+create policy "Users can read own player state"
+on public.player_state for select
+to authenticated
+using (auth.uid() = id);
+
+create policy "Users can insert own player state"
+on public.player_state for insert
+to authenticated
+with check (auth.uid() = id);
+
+create policy "Users can update own player state"
+on public.player_state for update
+to authenticated
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+drop trigger if exists player_state_set_updated_at on public.player_state;
+create trigger player_state_set_updated_at
+before update on public.player_state
+for each row execute procedure public.set_updated_at();
