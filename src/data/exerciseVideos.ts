@@ -85,6 +85,16 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=3hRXONs0B8E',
     source: 'Dr. Dish Basketball — Pick & Roll Progression with Skylar Diggins-Smith'
   },
+  'ps-01': {
+    youtubeId: 'akNbK7X_EsM',
+    videoUrl: 'https://www.youtube.com/watch?v=akNbK7X_EsM',
+    source: 'Jr. NBA Jr. WNBA — Pound and Pass Drill'
+  },
+  'ps-02': {
+    youtubeId: 'y7uxFUC9phU',
+    videoUrl: 'https://www.youtube.com/watch?v=y7uxFUC9phU',
+    source: 'Jr. NBA Jr. WNBA — Overhead Pass Drill'
+  },
   'df-01': {
     youtubeId: 'nOwQXU7IHZg',
     videoUrl: 'https://www.youtube.com/watch?v=nOwQXU7IHZg',
