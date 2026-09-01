@@ -1,6 +1,7 @@
 import React from 'react';
-import { Clock, Target, MapPin, Dumbbell, ArrowRight } from 'lucide-react';
+import { Clock, Target, MapPin, Dumbbell, ArrowRight, Video } from 'lucide-react';
 import { Exercise } from '../../types';
+import { EXERCISE_VIDEO_SOURCES } from '../../data/exerciseVideos';
 
 interface ExerciseCardProps {
   exercise: Exercise;
@@ -12,6 +13,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onSelect, 
   const equipmentLabel = exercise.equipment.length
     ? exercise.equipment.slice(0, 2).join(' + ')
     : 'Sem equipamento';
+  const videoSource = EXERCISE_VIDEO_SOURCES[exercise.id];
 
   return (
     <button
@@ -38,6 +40,13 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onSelect, 
             {exercise.difficulty}
           </span>
         </div>
+
+        {videoSource && (
+          <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/70 border border-white/10 backdrop-blur-sm text-[9px] font-bold uppercase tracking-wider text-white">
+            <Video className="w-3.5 h-3.5 text-[#FF6B1A]" />
+            Vídeo disponível
+          </div>
+        )}
       </div>
 
       <div className="p-4 sm:p-5 flex flex-col flex-1">
@@ -61,6 +70,13 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onSelect, 
             <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-[#FF6B1A]" />{exercise.sets} séries</span>
             <span className="flex items-center gap-1.5 min-w-0"><Dumbbell className="w-3.5 h-3.5 text-[#FF6B1A] flex-shrink-0" /><span className="truncate">{equipmentLabel}</span></span>
           </div>
+
+          {videoSource && !compact && (
+            <div className="mt-3 pt-3 border-t border-white/[0.05] min-w-0">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-[#66717D] block">Demonstração</span>
+              <span className="text-[10px] text-[#AAB2BC] line-clamp-1">{videoSource.source}</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-3">
