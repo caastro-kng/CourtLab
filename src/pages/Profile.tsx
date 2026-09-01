@@ -89,8 +89,8 @@ export const Profile: React.FC = () => {
       setProfileError('Escolha uma imagem JPG, PNG ou WebP.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError('A foto deve ter no máximo 2 MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('A foto deve ter no máximo 5 MB.');
       return;
     }
     if (!user || !supabase) {

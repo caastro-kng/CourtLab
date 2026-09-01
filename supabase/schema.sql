@@ -120,7 +120,7 @@ revoke all on table public.profiles from anon;
 revoke all on table public.player_state from anon;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('avatars', 'avatars', true, 2097152, array['image/jpeg', 'image/png', 'image/webp'])
+values ('avatars', 'avatars', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do update
 set public = excluded.public,
     file_size_limit = excluded.file_size_limit,
