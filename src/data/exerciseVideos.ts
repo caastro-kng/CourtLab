@@ -100,6 +100,21 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=Tnmcl9ZqYZ4',
     source: 'Baller Boot Camp — Reverse Layup Tutorial: How To Make Reverse Layups In Basketball'
   },
+  'fn-06': {
+    youtubeId: 'R_d1Koyp-nE',
+    videoUrl: 'https://www.youtube.com/watch?v=R_d1Koyp-nE',
+    source: 'Sava Jerkic — How to Finish with SPIN MOVE in Basketball?!'
+  },
+  'fn-07': {
+    youtubeId: 'p-2j-sBBPPM',
+    videoUrl: 'https://www.youtube.com/watch?v=p-2j-sBBPPM',
+    source: 'Coach Frikki — Pro Hop: Ultimate Guide (Unstoppable Basketball Finish)'
+  },
+  'fn-08': {
+    youtubeId: 'd0z7QqblJaM',
+    videoUrl: 'https://www.youtube.com/watch?v=d0z7QqblJaM',
+    source: 'Get Handles Basketball — Layup Fundamentals with High-Off-Glass Finishing'
+  },
   'fw-01': {
     youtubeId: 'qGO5U5H-DQE',
     videoUrl: 'https://www.youtube.com/watch?v=qGO5U5H-DQE',
