@@ -20,11 +20,13 @@ import {
   Minus,
   Plus,
   Video,
-  ExternalLink
+  ExternalLink,
+  Eye
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Workout, Exercise } from '../../types';
 import { usePlayer } from '../../context/PlayerContext';
+import { EXERCISE_VIDEO_SOURCES } from '../../data/exerciseVideos';
 import { CourtDiagram } from '../common/CourtDiagram';
 
 interface WorkoutPlayerProps {
@@ -59,6 +61,10 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
   const exercise: Exercise | undefined = currentItem ? getExerciseById(currentItem.exerciseId) : undefined;
   const targetSets = currentItem?.customSets || exercise?.sets || 3;
   const restDuration = currentItem?.restSeconds || 30;
+  const videoSource = exercise ? EXERCISE_VIDEO_SOURCES[exercise.id] : undefined;
+  const videoWatchCue = exercise?.tips?.[0]
+    || exercise?.instructions?.[1]
+    || 'Observe postura, ritmo, base e controle antes de repetir o movimento.';
 
   const videoEmbedUrl = useMemo(() => {
     if (!exercise) return null;
@@ -134,6 +140,15 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
     setShowVideo(false);
     setResumeTimerAfterVideo(false);
   }, [currentExerciseIndex]);
+
+  useEffect(() => {
+    if (!showVideo) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeVideoDemo();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showVideo, resumeTimerAfterVideo, activeDrillTimer]);
 
   const playBeep = () => {
     if (isMuted) return;
@@ -477,15 +492,15 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
       </footer>
 
       {showVideo && (
-        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5" role="dialog" aria-modal="true" aria-label={`Demonstração de ${exercise.name}`}>
-          <div className="w-full max-w-3xl rounded-t-3xl sm:rounded-3xl bg-[#0D1014] border border-[#2B3542] overflow-hidden shadow-2xl">
-            <div className="flex items-start justify-between gap-4 p-4 sm:p-5 border-b border-[#1F2630]">
+        <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5" role="dialog" aria-modal="true" aria-label={`Demonstração de ${exercise.name}`}>
+          <div className="w-full max-w-3xl max-h-[94dvh] sm:max-h-[92vh] rounded-t-[28px] sm:rounded-3xl bg-[#0D1014] border border-[#2B3542] overflow-y-auto overscroll-contain shadow-2xl pb-[env(safe-area-inset-bottom)]">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-5 border-b border-[#1F2630] bg-[#0D1014]/95 backdrop-blur-xl">
               <div className="min-w-0">
                 <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-[#FF6B1A] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração</span>
-                <h3 className="text-lg sm:text-xl font-heading mt-1 truncate">{exercise.name}</h3>
+                <h3 className="text-lg sm:text-xl font-heading mt-1 line-clamp-2">{exercise.name}</h3>
                 <p className="text-xs text-[#9AA1AA] mt-1">Assista ao movimento e volte para a série sem sair do treino.</p>
               </div>
-              <button onClick={closeVideoDemo} className="w-10 h-10 rounded-xl bg-[#15191F] border border-[#1F2630] flex-shrink-0 flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Fechar demonstração"><X className="w-5 h-5" /></button>
+              <button onClick={closeVideoDemo} className="w-11 h-11 rounded-xl bg-[#15191F] border border-[#1F2630] flex-shrink-0 flex items-center justify-center text-[#9AA1AA] hover:text-white" aria-label="Fechar demonstração"><X className="w-5 h-5" /></button>
             </div>
 
             {videoEmbedUrl ? (
@@ -505,17 +520,35 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({ workout, onClose }
               </div>
             )}
 
-            <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="text-xs text-[#9AA1AA]">
+            <div className="p-4 sm:p-5 space-y-4">
+              <div className="rounded-2xl bg-[#11151A] border border-[#1F2630] p-4">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" />O que observar</span>
+                <p className="text-sm text-white leading-relaxed mt-1.5">{videoWatchCue}</p>
+              </div>
+
+              {videoSource?.source && (
+                <div className="flex items-start gap-3 px-1">
+                  <div className="w-8 h-8 rounded-lg bg-[#15191F] border border-[#1F2630] flex items-center justify-center flex-shrink-0"><Video className="w-4 h-4 text-[#FF8D4D]" /></div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-[#707985] block">Fonte do vídeo</span>
+                    <span className="text-xs sm:text-sm text-[#D7DBE0] leading-relaxed block mt-0.5">{videoSource.source}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-xs text-[#9AA1AA] px-1">
                 {resumeTimerAfterVideo ? 'O cronômetro foi pausado e volta ao fechar o vídeo.' : 'O cronômetro permanece pausado enquanto você assiste.'}
               </div>
-              <div className="flex gap-2">
+            </div>
+
+            <div className="sticky bottom-0 z-10 p-4 sm:p-5 pt-3 bg-[#0D1014]/95 backdrop-blur-xl border-t border-[#1F2630]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {exercise.videoUrl && (
-                  <a href={exercise.videoUrl} target="_blank" rel="noreferrer" className="min-h-11 px-4 rounded-xl bg-[#15191F] border border-[#2B3542] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                  <a href={exercise.videoUrl} target="_blank" rel="noreferrer" className="min-h-12 px-4 rounded-xl bg-[#15191F] border border-[#2B3542] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
                     <ExternalLink className="w-4 h-4" />Abrir no YouTube
                   </a>
                 )}
-                <button onClick={closeVideoDemo} className="min-h-11 px-5 rounded-xl bg-[#FF6B1A] text-xs font-bold uppercase tracking-wider">Voltar ao treino</button>
+                <button onClick={closeVideoDemo} className="min-h-12 px-5 rounded-xl bg-[#FF6B1A] text-xs font-bold uppercase tracking-wider">Voltar ao treino</button>
               </div>
             </div>
           </div>
