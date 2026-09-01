@@ -86,70 +86,52 @@ const INITIAL_SKILLS: SkillRating[] = [
 ];
 
 const INITIAL_WEEKLY_PLAN: DayPlan[] = [
-  { dayOfWeek: 1, dayName: 'SEG', workoutId: 'wk-ball-handle-foundations', customTitle: 'Controle de Bola + Shooting', isRest: false, completed: true, completedAt: '2026-08-25' },
-  { dayOfWeek: 2, dayName: 'TER', workoutId: 'wk-finishing-lab', customTitle: 'Finishing Lab', isRest: false, completed: true, completedAt: '2026-08-26' },
-  { dayOfWeek: 3, dayName: 'QUA', customTitle: 'Descanso Ativo', isRest: true, completed: true, completedAt: '2026-08-27' },
-  { dayOfWeek: 4, dayName: 'QUI', workoutId: 'wk-shot-creator', customTitle: 'Shot Creation', isRest: false, completed: true, completedAt: '2026-08-28' },
+  { dayOfWeek: 1, dayName: 'SEG', workoutId: 'wk-ball-handle-foundations', customTitle: 'Controle de Bola + Shooting', isRest: false, completed: false },
+  { dayOfWeek: 2, dayName: 'TER', workoutId: 'wk-finishing-lab', customTitle: 'Finishing Lab', isRest: false, completed: false },
+  { dayOfWeek: 3, dayName: 'QUA', customTitle: 'Descanso Ativo', isRest: true, completed: false },
+  { dayOfWeek: 4, dayName: 'QUI', workoutId: 'wk-shot-creator', customTitle: 'Shot Creation', isRest: false, completed: false },
   { dayOfWeek: 5, dayName: 'SEX', workoutId: 'wk-pnr-guard', customTitle: 'Pick and Roll Guard', isRest: false, completed: false },
   { dayOfWeek: 6, dayName: 'SÁB', workoutId: 'wk-perimeter-defense', customTitle: 'Defesa + Conditioning', isRest: false, completed: false },
   { dayOfWeek: 7, dayName: 'DOM', customTitle: 'Descanso e Recuperação', isRest: true, completed: false }
 ];
 
 const INITIAL_GOALS: Goal[] = [
-  { id: 'g1', title: '500 arremessos esta semana', category: 'arremessos', targetValue: 500, currentValue: 340, unit: 'arremessos', completed: false, iconName: 'Target' },
-  { id: 'g2', title: 'Treinar 4 dias', category: 'treinos', targetValue: 4, currentValue: 3, unit: 'treinos', completed: false, iconName: 'Flame' },
-  { id: 'g3', title: '3 treinos de mão fraca', category: 'fundamento', targetValue: 3, currentValue: 2, unit: 'treinos', completed: false, iconName: 'Hand' },
-  { id: 'g4', title: 'Fazer 100 lances livres', category: 'arremessos', targetValue: 100, currentValue: 80, unit: 'lances livres', completed: false, iconName: 'Award' }
+  { id: 'g1', title: '500 arremessos esta semana', category: 'arremessos', targetValue: 500, currentValue: 0, unit: 'arremessos', completed: false, iconName: 'Target' },
+  { id: 'g2', title: 'Treinar 4 dias', category: 'treinos', targetValue: 4, currentValue: 0, unit: 'treinos', completed: false, iconName: 'Flame' },
+  { id: 'g3', title: '3 treinos de mão fraca', category: 'fundamento', targetValue: 3, currentValue: 0, unit: 'treinos', completed: false, iconName: 'Hand' },
+  { id: 'g4', title: 'Fazer 100 lances livres', category: 'arremessos', targetValue: 100, currentValue: 0, unit: 'lances livres', completed: false, iconName: 'Award' }
 ];
 
-const INITIAL_LOGS: WorkoutSessionLog[] = [
-  {
-    id: 'log-1',
-    workoutId: 'wk-ball-handle-foundations',
-    workoutTitle: 'Controle de Bola + Shooting',
-    completedAt: '2026-08-25T17:30:00Z',
-    durationMinutes: 42,
-    exercisesCompleted: 8,
-    totalSets: 24,
-    totalReps: 160,
-    shotsMade: 90,
-    xpEarned: 120,
-    perceivedDifficulty: 'Bom'
-  },
-  {
-    id: 'log-2',
-    workoutId: 'wk-finishing-lab',
-    workoutTitle: 'Finishing Lab',
-    completedAt: '2026-08-26T18:00:00Z',
-    durationMinutes: 48,
-    exercisesCompleted: 9,
-    totalSets: 27,
-    totalReps: 180,
-    shotsMade: 110,
-    xpEarned: 130,
-    perceivedDifficulty: 'Difícil'
-  },
-  {
-    id: 'log-3',
-    workoutId: 'wk-shot-creator',
-    workoutTitle: 'Shot Creation',
-    completedAt: '2026-08-28T16:45:00Z',
-    durationMinutes: 45,
-    exercisesCompleted: 8,
-    totalSets: 24,
-    totalReps: 156,
-    shotsMade: 120,
-    xpEarned: 120,
-    perceivedDifficulty: 'Bom'
-  }
+const INITIAL_LOGS: WorkoutSessionLog[] = [];
+
+const FRESH_START_VERSION = 'fresh-start-v1';
+const PROGRESS_STORAGE_KEYS = [
+  'courtlab_xp',
+  'courtlab_weekly_plan',
+  'courtlab_goals',
+  'courtlab_logs',
+  'courtlab_custom_workouts',
+  'courtlab_active_workout'
 ];
+
+const ensureFreshStart = () => {
+  try {
+    if (localStorage.getItem('courtlab_progress_version') === FRESH_START_VERSION) return;
+    PROGRESS_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    localStorage.setItem('courtlab_progress_version', FRESH_START_VERSION);
+  } catch {
+    // The app can still use in-memory zeroed defaults when storage is unavailable.
+  }
+};
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  ensureFreshStart();
+
   const [profile, setProfile] = useState<PlayerProfile>(() => readStorage('courtlab_profile', INITIAL_PROFILE));
   const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage('courtlab_skills', INITIAL_SKILLS));
-  const [xp, setXp] = useState<number>(() => readNumberStorage('courtlab_xp', 1420));
+  const [xp, setXp] = useState<number>(() => readNumberStorage('courtlab_xp', 0));
   const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN));
   const [goals, setGoals] = useState<Goal[]>(() => readStorage('courtlab_goals', INITIAL_GOALS));
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => readStorage('courtlab_logs', INITIAL_LOGS));
