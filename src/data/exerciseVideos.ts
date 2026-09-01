@@ -164,6 +164,16 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     youtubeId: '85WXNSGpV3w',
     videoUrl: 'https://www.youtube.com/watch?v=85WXNSGpV3w',
     source: 'Dr. Dish Basketball — Flare Screen Shooting with Tony Miller'
+  },
+  'pg-01': {
+    youtubeId: 'kcwCvwCBU-A',
+    videoUrl: 'https://www.youtube.com/watch?v=kcwCvwCBU-A',
+    source: 'Howcast — How to Do a Drop-Step | Basketball Moves'
+  },
+  'at-01': {
+    youtubeId: '-ynzj6U5wrY',
+    videoUrl: 'https://www.youtube.com/watch?v=-ynzj6U5wrY',
+    source: 'Les Spellman — Lateral Bounds Demonstration | How To Properly Do Lateral Bounds'
   }
 };
 
