@@ -16,11 +16,12 @@ import {
 } from 'lucide-react';
 import { EXERCISES_DATA } from '../data/exercises';
 import { ExerciseCard } from '../components/common/ExerciseCard';
-import { Exercise } from '../types';
+import { Exercise, SkillCategory } from '../types';
 import { usePlayer } from '../context/PlayerContext';
 import { rankExercises } from '../utils/personalization';
+import { getCategoryVisual } from '../utils/categoryVisual';
 
-const CATEGORY_OPTIONS = [
+const CATEGORY_OPTIONS: { id: 'all' | SkillCategory; label: string }[] = [
   { id: 'all', label: 'Todos' },
   { id: 'ball-handle', label: 'Ball Handle' },
   { id: 'shooting', label: 'Arremesso' },
@@ -145,25 +146,31 @@ export const Library: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 border-y border-white/[0.06] md:divide-x divide-white/[0.06]">
-            {personalizedExercises.map((recommendation, index) => (
-              <button
-                key={recommendation.item.id}
-                type="button"
-                onClick={() => onSelectExercise(recommendation.item)}
-                className="group text-left px-1 py-5 md:px-5 first:md:pl-0 last:md:pr-0 border-b last:border-b-0 md:border-b-0 border-white/[0.06] hover:bg-white/[0.015] transition-colors"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-black text-[#FF6B1A]">#{index + 1}</span>
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-[#74808C]">{recommendation.item.categoryLabel}</span>
-                </div>
-                <h3 className="text-base font-heading text-white group-hover:text-[#FF8D4D] transition-colors">{recommendation.item.name}</h3>
-                <p className="text-[11px] text-[#89939E] mt-2 leading-relaxed">{recommendation.reason}</p>
-                <div className="flex items-center gap-3 mt-4 text-[10px] text-[#AAB2BC]">
-                  <span className="flex items-center gap-1"><Clock3 className="w-3.5 h-3.5 text-[#FF6B1A]" />{recommendation.item.durationMinutes} min</span>
-                  <span>{recommendation.item.difficulty}</span>
-                </div>
-              </button>
-            ))}
+            {personalizedExercises.map((recommendation, index) => {
+              const visual = getCategoryVisual(recommendation.item.category);
+              return (
+                <button
+                  key={recommendation.item.id}
+                  type="button"
+                  onClick={() => onSelectExercise(recommendation.item)}
+                  className="group relative text-left px-1 py-5 md:px-5 first:md:pl-0 last:md:pr-0 border-b last:border-b-0 md:border-b-0 border-white/[0.06] hover:bg-white/[0.015] transition-colors"
+                >
+                  <span className="absolute left-0 top-5 bottom-5 w-[2px] rounded-full hidden md:block" style={{ backgroundColor: visual.accent }} />
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-black text-[#FF6B1A]">#{index + 1}</span>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: visual.accent }} />
+                    <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: visual.accent }}>{recommendation.item.categoryLabel}</span>
+                  </div>
+                  <h3 className="text-base font-heading text-white group-hover:text-[#F4F6F8] transition-colors">{recommendation.item.name}</h3>
+                  <p className="text-[11px] text-[#89939E] mt-2 leading-relaxed">{recommendation.reason}</p>
+                  <div className="flex items-center gap-3 mt-4 text-[10px] text-[#AAB2BC]">
+                    <span className="flex items-center gap-1"><Clock3 className="w-3.5 h-3.5 text-[#FF6B1A]" />{recommendation.item.durationMinutes} min</span>
+                    <span>{recommendation.item.difficulty}</span>
+                    <span className="ml-auto uppercase text-[#626D78]">{visual.label}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -221,18 +228,23 @@ export const Library: React.FC = () => {
           )}
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/[0.06] pb-3">
-          {CATEGORY_OPTIONS.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                selectedCategory === category.id ? 'bg-[#FF6B1A] text-white' : 'text-[#8F99A4] hover:text-white hover:bg-white/[0.035]'
-              }`}
-            >
-              {category.label}
-            </button>
-          ))}
+        <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none border-b border-white/[0.06]">
+          {CATEGORY_OPTIONS.map((category) => {
+            const active = selectedCategory === category.id;
+            const visual = category.id === 'all' ? null : getCategoryVisual(category.id);
+            return (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-colors inline-flex items-center gap-2 ${
+                  active ? 'bg-white text-[#0B0E12]' : 'text-[#8F99A4] hover:text-white hover:bg-white/[0.035]'
+                }`}
+              >
+                {visual && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: visual.accent }} />}
+                {category.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-5">
