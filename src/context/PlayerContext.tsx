@@ -14,6 +14,8 @@ import { WORKOUTS_DATA } from '../data/workouts';
 import { EXERCISES_DATA } from '../data/exercises';
 import { calculateTrainingStreaks, deriveSkillProgress, getTierFromXp, XP_REWARDS } from '../utils/progression';
 import { readNumberStorage, readStorage, writeStorage } from '../utils/storage';
+import { useAuth } from './AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface PlayerContextType {
   profile: PlayerProfile;
@@ -47,24 +49,64 @@ interface PlayerContextType {
   loginAsDemo: () => void;
 }
 
-const INITIAL_PROFILE: PlayerProfile = {
-  name: 'Caio',
-  age: 19,
-  height: '1.88m',
-  weight: '82kg',
+type ProfileRow = {
+  id: string;
+  name: string | null;
+  age: number | null;
+  height: string | null;
+  weight: string | null;
+  position: string | null;
+  dominant_hand: string | null;
+  level: string | null;
+  city: string | null;
+  bio: string | null;
+  primary_goals: string[] | null;
+};
+
+const BASE_PROFILE: PlayerProfile = {
+  name: 'Jogador',
+  age: 18,
+  height: '',
+  weight: '',
   position: 'SG / PG',
   dominantHand: 'Direita',
-  level: 'Intermediário',
-  primaryGoals: [
-    'Melhorar arremesso',
-    'Melhorar controle de bola',
-    'Criar espaço',
-    'Melhorar finalização',
-    'Pick and Roll'
-  ],
-  bio: 'Armador focado em evolução individual constante, arremesso após drible e leitura de defesas no Pick and Roll.',
-  city: 'São Paulo, SP'
+  level: 'Iniciante',
+  primaryGoals: [],
+  bio: '',
+  city: ''
 };
+
+const profileFromAuth = (name?: string | null): PlayerProfile => ({
+  ...BASE_PROFILE,
+  name: name?.trim() || BASE_PROFILE.name
+});
+
+const profileFromRow = (row: ProfileRow, fallback: PlayerProfile): PlayerProfile => ({
+  name: row.name?.trim() || fallback.name,
+  age: typeof row.age === 'number' ? row.age : fallback.age,
+  height: row.height ?? fallback.height,
+  weight: row.weight ?? fallback.weight,
+  position: (row.position as PlayerProfile['position']) || fallback.position,
+  dominantHand: (row.dominant_hand as PlayerProfile['dominantHand']) || fallback.dominantHand,
+  level: (row.level as PlayerProfile['level']) || fallback.level,
+  city: row.city ?? fallback.city,
+  bio: row.bio ?? fallback.bio,
+  primaryGoals: Array.isArray(row.primary_goals) ? row.primary_goals : fallback.primaryGoals
+});
+
+const profileToRow = (id: string, profile: PlayerProfile) => ({
+  id,
+  name: profile.name,
+  age: profile.age,
+  height: profile.height,
+  weight: profile.weight,
+  position: profile.position,
+  dominant_hand: profile.dominantHand,
+  level: profile.level,
+  city: profile.city || '',
+  bio: profile.bio || '',
+  primary_goals: profile.primaryGoals
+});
 
 const INITIAL_SKILLS: SkillRating[] = [
   { key: 'ball-handle', name: 'Controle de Bola', score: 7.0, category: 'Técnica' },
@@ -128,8 +170,10 @@ const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ensureFreshStart();
+  const { user } = useAuth();
+  const authName = typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : '';
 
-  const [profile, setProfile] = useState<PlayerProfile>(() => readStorage('courtlab_profile', INITIAL_PROFILE));
+  const [profile, setProfile] = useState<PlayerProfile>(() => profileFromAuth(authName));
   const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage('courtlab_skills', INITIAL_SKILLS));
   const [xp, setXp] = useState<number>(() => readNumberStorage('courtlab_xp', 0));
   const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN));
@@ -139,7 +183,45 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(() => readStorage('courtlab_active_workout', null));
   const [isLoggedInDemo, setIsLoggedInDemo] = useState<boolean>(true);
 
-  useEffect(() => writeStorage('courtlab_profile', profile), [profile]);
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    let cancelled = false;
+    const fallback = profileFromAuth(typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : '');
+    setProfile(fallback);
+
+    const hydrateProfile = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,name,age,height,weight,position,dominant_hand,level,city,bio,primary_goals')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('CourtLab profile load failed:', error.message);
+        return;
+      }
+
+      if (data) {
+        setProfile(profileFromRow(data as ProfileRow, fallback));
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .upsert(profileToRow(user.id, fallback), { onConflict: 'id' });
+
+      if (insertError) console.error('CourtLab profile creation failed:', insertError.message);
+    };
+
+    void hydrateProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   useEffect(() => writeStorage('courtlab_skills', skillsRating), [skillsRating]);
   useEffect(() => writeStorage('courtlab_xp', String(xp)), [xp]);
   useEffect(() => writeStorage('courtlab_weekly_plan', weeklyPlan), [weeklyPlan]);
@@ -169,7 +251,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const updateProfile = (updated: Partial<PlayerProfile>) => {
-    setProfile((prev) => ({ ...prev, ...updated }));
+    setProfile((previous) => {
+      const next = { ...previous, ...updated };
+
+      if (user && supabase) {
+        void supabase
+          .from('profiles')
+          .upsert(profileToRow(user.id, next), { onConflict: 'id' })
+          .then(({ error }) => {
+            if (error) console.error('CourtLab profile save failed:', error.message);
+          });
+
+        if (updated.name && updated.name !== previous.name) {
+          void supabase.auth.updateUser({ data: { ...user.user_metadata, name: next.name } });
+        }
+      }
+
+      return next;
+    });
   };
 
   const updateSkillRating = (key: string, newScore: number) => {
