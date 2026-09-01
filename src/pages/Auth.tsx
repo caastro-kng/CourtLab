@@ -15,6 +15,12 @@ export const Auth: React.FC = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  const changeMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    setError('');
+    setMessage('');
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
@@ -88,7 +94,7 @@ export const Auth: React.FC = () => {
             <label className="block"><span className="cl-label text-[#8F98A4]">E-mail</span><div className="mt-2 relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required type="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="voce@email.com" /></div></label>
             {mode !== 'forgot' && <label className="block"><span className="cl-label text-[#8F98A4]">Senha</span><div className="mt-2 relative"><LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required minLength={6} type={showPassword?'text':'password'} value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-11 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Mínimo de 6 caracteres" /><button type="button" onClick={()=>setShowPassword((v)=>!v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#697481] hover:text-white" aria-label="Mostrar ou ocultar senha">{showPassword?<EyeOff className="w-4 h-4"/>:<Eye className="w-4 h-4"/>}</button></div></label>}
 
-            {mode === 'login' && <div className="flex justify-end"><button type="button" onClick={()=>{setMode('forgot');setError('');setMessage('');}} className="text-xs font-semibold text-[#FF8D4D]">Esqueci minha senha</button></div>}
+            {mode === 'login' && <div className="flex justify-end"><button type="button" onClick={()=>changeMode('forgot')} className="text-xs font-semibold text-[#FF8D4D]">Esqueci minha senha</button></div>}
 
             <button disabled={loading || !configured} className="w-full min-h-12 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] disabled:opacity-50 disabled:cursor-not-allowed cl-button-text text-white flex items-center justify-center gap-2">
               {loading ? 'Processando...' : mode === 'register' ? 'Criar minha conta' : mode === 'forgot' ? 'Enviar recuperação' : 'Entrar'}
@@ -97,7 +103,7 @@ export const Auth: React.FC = () => {
           </form>
 
           <div className="mt-6 pt-6 border-t border-white/[0.07] text-center text-sm text-[#8F98A4]">
-            {mode === 'register' ? <>Já possui conta? <button onClick={()=>setMode('login')} className="font-bold text-white">Entrar</button></> : mode === 'forgot' ? <button onClick={()=>setMode('login')} className="font-bold text-white">Voltar para entrar</button> : <>Ainda não tem conta? <button onClick={()=>setMode('register')} className="font-bold text-white">Criar conta</button></>}
+            {mode === 'register' ? <>Já possui conta? <button onClick={()=>changeMode('login')} className="font-bold text-white">Entrar</button></> : mode === 'forgot' ? <button onClick={()=>changeMode('login')} className="font-bold text-white">Voltar para entrar</button> : <>Ainda não tem conta? <button onClick={()=>changeMode('register')} className="font-bold text-white">Criar conta</button></>}
           </div>
         </div>
       </main>
