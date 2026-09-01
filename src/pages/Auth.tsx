@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 type Mode = 'login' | 'register' | 'forgot';
 
 export const Auth: React.FC = () => {
-  const { signIn, signUp, resetPassword, configured } = useAuth();
+  const { signIn, signUp, resetPassword, configured, configurationError } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,11 +21,11 @@ export const Auth: React.FC = () => {
     setMessage('');
     setLoading(true);
 
-    const result = mode === 'register'
-      ? await signUp(name, email, password)
+    const result = await (mode === 'register'
+      ? signUp(name, email, password)
       : mode === 'forgot'
-        ? await resetPassword(email)
-        : await signIn(email, password);
+        ? resetPassword(email)
+        : signIn(email, password));
 
     setLoading(false);
     if (result.error) {
@@ -79,7 +79,7 @@ export const Auth: React.FC = () => {
             {mode === 'register' ? 'Crie sua identidade de atleta e mantenha sua evolução vinculada à sua conta.' : mode === 'forgot' ? 'Informe seu e-mail para receber o link de recuperação.' : 'Continue de onde parou e volte para a quadra.'}
           </p>
 
-          {!configured && <div className="mt-6 p-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] text-sm text-amber-200">As variáveis do Supabase ainda não estão disponíveis neste ambiente.</div>}
+          {!configured && <div className="mt-6 p-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] text-sm text-amber-200">{configurationError ?? 'As variáveis do Supabase ainda não estão disponíveis neste ambiente.'}</div>}
           {message && <div className="mt-6 p-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.06] text-sm text-emerald-300">{message}</div>}
           {error && <div className="mt-6 p-4 rounded-2xl border border-red-400/25 bg-red-400/[0.06] text-sm text-red-300">{error}</div>}
 
