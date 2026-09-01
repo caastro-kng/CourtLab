@@ -21,6 +21,7 @@ import {
 import { Exercise, Workout } from '../../types';
 import { CourtDiagram } from './CourtDiagram';
 import { usePlayer } from '../../context/PlayerContext';
+import { EXERCISE_VIDEO_SOURCES } from '../../data/exerciseVideos';
 
 interface DrillModalProps {
   exercise: Exercise | null;
@@ -63,19 +64,22 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
 
   const videoEmbedUrl = useMemo(() => {
     if (!exercise) return null;
-    if (exercise.youtubeId) return `https://www.youtube.com/embed/${exercise.youtubeId}`;
+    if (exercise.youtubeId) return `https://www.youtube-nocookie.com/embed/${exercise.youtubeId}`;
     if (exercise.videoUrl?.includes('youtube.com/watch?v=')) {
       const id = exercise.videoUrl.split('v=')[1]?.split('&')[0];
-      return id ? `https://www.youtube.com/embed/${id}` : null;
+      return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
     }
     if (exercise.videoUrl?.includes('youtu.be/')) {
       const id = exercise.videoUrl.split('youtu.be/')[1]?.split('?')[0];
-      return id ? `https://www.youtube.com/embed/${id}` : null;
+      return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
     }
     return null;
   }, [exercise]);
 
   if (!isOpen || !exercise) return null;
+
+  const videoSource = EXERCISE_VIDEO_SOURCES[exercise.id];
+  const videoAvailable = Boolean(videoSource || videoEmbedUrl || exercise.videoUrl);
 
   const standaloneWorkout: Workout = {
     id: `drill-${exercise.id}`,
@@ -164,6 +168,15 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
               <span className="px-2.5 py-1 rounded-lg bg-black/55 border border-white/10 text-white text-[10px] sm:text-xs font-semibold flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {exercise.space}
               </span>
+              {videoAvailable && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('video')}
+                  className="px-2.5 py-1 rounded-lg bg-[#FF6B1A]/20 border border-[#FF6B1A]/40 text-[#FFB184] text-[10px] sm:text-xs font-bold flex items-center gap-1.5 hover:bg-[#FF6B1A]/30 transition-colors"
+                >
+                  <Video className="w-3.5 h-3.5" /> Vídeo disponível
+                </button>
+              )}
             </div>
 
             <span className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-[#FF9B62] font-bold">
@@ -195,6 +208,7 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
                 >
                   <Icon className={`w-4 h-4 ${active ? 'text-[#FF6B1A]' : ''}`} />
                   {tab.label}
+                  {tab.id === 'video' && videoAvailable && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-label="Vídeo disponível" />}
                 </button>
               );
             })}
@@ -286,6 +300,17 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
                       Faça as primeiras repetições em velocidade controlada. Aumente o ritmo apenas quando conseguir manter o mesmo padrão técnico.
                     </p>
                   </div>
+                  {videoAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('video')}
+                      className="w-full p-4 rounded-2xl bg-[#FF6B1A]/[0.06] border border-[#FF6B1A]/25 text-left hover:bg-[#FF6B1A]/10 transition-colors"
+                    >
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#FF9B62] flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />Demonstração disponível</span>
+                      <span className="text-sm font-bold text-white block mt-1">Veja o movimento antes de treinar</span>
+                      {videoSource?.source && <span className="text-[11px] text-[#8F98A2] block mt-1 line-clamp-2">{videoSource.source}</span>}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -338,10 +363,17 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
 
           {activeTab === 'video' && (
             <div className="space-y-5">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF6B1A]">Demonstração</span>
-                <h3 className="text-2xl font-heading text-white">Veja antes de executar</h3>
-                <p className="text-sm text-[#9DA5AE] mt-1">Use o vídeo para observar ritmo, base, altura do drible e sequência dos pés.</p>
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF6B1A]">Demonstração</span>
+                  <h3 className="text-2xl font-heading text-white">Veja antes de executar</h3>
+                  <p className="text-sm text-[#9DA5AE] mt-1">Use o vídeo para reconhecer o movimento e depois volte para as instruções em português.</p>
+                </div>
+                {videoSource && (
+                  <span className="inline-flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-emerald-400">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Vídeo curado
+                  </span>
+                )}
               </div>
 
               {videoEmbedUrl ? (
@@ -350,7 +382,7 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
                     src={videoEmbedUrl}
                     title={`Demonstração de ${exercise.name}`}
                     className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 </div>
@@ -370,14 +402,27 @@ export const DrillModal: React.FC<DrillModalProps> = ({ exercise, isOpen, onClos
                 </div>
               )}
 
-              {exercise.videoUrl && !videoEmbedUrl && (
+              {videoAvailable && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <section className="p-4 rounded-2xl bg-emerald-500/[0.05] border border-emerald-500/20">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5"><Target className="w-3.5 h-3.5" />O que observar</span>
+                    <p className="text-sm text-[#D9E7DF] leading-relaxed mt-2">{exercise.tips?.[0] || exercise.instructions?.[0] || 'Observe a base, o ritmo e a sequência do movimento antes de aumentar a velocidade.'}</p>
+                  </section>
+                  <section className="p-4 rounded-2xl bg-[#12171D] border border-[#1F2630]">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-[#8F98A2] flex items-center gap-1.5"><Video className="w-3.5 h-3.5 text-[#FF6B1A]" />Fonte da demonstração</span>
+                    <p className="text-sm text-white leading-relaxed mt-2">{videoSource?.source || 'Vídeo externo vinculado ao exercício'}</p>
+                  </section>
+                </div>
+              )}
+
+              {exercise.videoUrl && (
                 <a
                   href={exercise.videoUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-3 rounded-xl border border-[#2B3542] bg-[#151A20] text-sm font-bold text-white flex items-center justify-center gap-2 hover:border-[#FF6B1A]/60 transition-colors"
                 >
-                  <ExternalLink className="w-4 h-4 text-[#FF6B1A]" /> Abrir vídeo original
+                  <ExternalLink className="w-4 h-4 text-[#FF6B1A]" /> Abrir vídeo original no YouTube
                 </a>
               )}
             </div>
