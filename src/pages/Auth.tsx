@@ -85,18 +85,18 @@ export const Auth: React.FC = () => {
             {mode === 'register' ? 'Crie sua identidade de atleta e mantenha sua evolução vinculada à sua conta.' : mode === 'forgot' ? 'Informe seu e-mail para receber o link de recuperação.' : 'Continue de onde parou e volte para a quadra.'}
           </p>
 
-          {!configured && <div className="mt-6 p-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] text-sm text-amber-200">{configurationError ?? 'As variáveis do Supabase ainda não estão disponíveis neste ambiente.'}</div>}
-          {message && <div className="mt-6 p-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.06] text-sm text-emerald-300">{message}</div>}
-          {error && <div className="mt-6 p-4 rounded-2xl border border-red-400/25 bg-red-400/[0.06] text-sm text-red-300">{error}</div>}
+          {!configured && <div role="alert" className="mt-6 p-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] text-sm text-amber-200">{configurationError ?? 'As variáveis do Supabase ainda não estão disponíveis neste ambiente.'}</div>}
+          {message && <div role="status" aria-live="polite" className="mt-6 p-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.06] text-sm text-emerald-300">{message}</div>}
+          {error && <div role="alert" aria-live="assertive" className="mt-6 p-4 rounded-2xl border border-red-400/25 bg-red-400/[0.06] text-sm text-red-300">{error}</div>}
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
+          <form onSubmit={submit} aria-busy={loading} className="mt-8 space-y-4">
             {mode === 'register' && <label className="block"><span className="cl-label text-[#8F98A4]">Nome</span><div className="mt-2 relative"><UserRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required value={name} onChange={(e)=>setName(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Seu nome" /></div></label>}
             <label className="block"><span className="cl-label text-[#8F98A4]">E-mail</span><div className="mt-2 relative"><Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required type="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-4 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="voce@email.com" /></div></label>
             {mode !== 'forgot' && <label className="block"><span className="cl-label text-[#8F98A4]">Senha</span><div className="mt-2 relative"><LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#697481]" /><input required minLength={6} type={showPassword?'text':'password'} value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full h-12 rounded-xl bg-[#11161C] border border-white/[0.08] pl-10 pr-11 text-sm text-white outline-none focus:border-[#FF6B1A]" placeholder="Mínimo de 6 caracteres" /><button type="button" onClick={()=>setShowPassword((v)=>!v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#697481] hover:text-white" aria-label="Mostrar ou ocultar senha">{showPassword?<EyeOff className="w-4 h-4"/>:<Eye className="w-4 h-4"/>}</button></div></label>}
 
             {mode === 'login' && <div className="flex justify-end"><button type="button" onClick={()=>changeMode('forgot')} className="text-xs font-semibold text-[#FF8D4D]">Esqueci minha senha</button></div>}
 
-            <button disabled={loading || !configured} className="w-full min-h-12 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] disabled:opacity-50 disabled:cursor-not-allowed cl-button-text text-white flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading || !configured} className="w-full min-h-12 rounded-xl bg-[#FF6B1A] hover:bg-[#FF7A2E] disabled:opacity-50 disabled:cursor-not-allowed cl-button-text text-white flex items-center justify-center gap-2">
               {loading ? 'Processando...' : mode === 'register' ? 'Criar minha conta' : mode === 'forgot' ? 'Enviar recuperação' : 'Entrar'}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>

@@ -22,9 +22,43 @@ const authErrorMessage = (error: unknown) => {
   if (error instanceof TypeError && error.message.toLowerCase().includes('fetch')) {
     return 'Não foi possível conectar ao Supabase. Verifique sua internet e tente novamente.';
   }
-  if (error instanceof Error && error.message) return error.message;
+
+  const message = error instanceof Error ? error.message : '';
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String(error.code)
+    : '';
+  const normalizedMessage = message.toLowerCase();
+
+  if (code === 'invalid_credentials' || normalizedMessage.includes('invalid login credentials')) {
+    return 'E-mail ou senha inválidos. Se ainda não criou sua conta, escolha “Criar conta”.';
+  }
+  if (code === 'email_not_confirmed' || normalizedMessage.includes('email not confirmed')) {
+    return 'Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada antes de entrar.';
+  }
+  if (code === 'user_already_exists' || normalizedMessage.includes('user already registered')) {
+    return 'Já existe uma conta com este e-mail. Entre com sua senha ou recupere o acesso.';
+  }
+  if (code === 'over_email_send_rate_limit' || normalizedMessage.includes('email rate limit exceeded')) {
+    return 'O serviço de e-mail atingiu o limite temporário. Aguarde um pouco e tente novamente.';
+  }
+  if (code === 'weak_password' || normalizedMessage.includes('password should be')) {
+    return 'Escolha uma senha mais forte, com pelo menos 6 caracteres.';
+  }
+  if (code === 'email_address_invalid' || normalizedMessage.includes('email address') && normalizedMessage.includes('invalid')) {
+    return 'Informe um endereço de e-mail válido.';
+  }
+  if (code === 'signup_disabled' || normalizedMessage.includes('signups not allowed')) {
+    return 'A criação de novas contas está temporariamente indisponível.';
+  }
+  if (code === 'over_request_rate_limit' || normalizedMessage.includes('too many requests')) {
+    return 'Muitas tentativas foram feitas. Aguarde alguns minutos e tente novamente.';
+  }
+
+  if (message) return message;
   return 'Não foi possível concluir a autenticação. Tente novamente.';
 };
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -72,14 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const redirectTo = `${window.location.origin}/`;
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: normalizeEmail(email),
           password,
           options: {
             emailRedirectTo: redirectTo,
             data: { name: name.trim() }
           }
         });
-        if (error) return { error: error.message };
+        if (error) return { error: authErrorMessage(error) };
         return { needsEmailConfirmation: !data.session };
       } catch (error) {
         return { error: authErrorMessage(error) };
@@ -88,8 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn: async (email, password) => {
       if (!supabase) return { error: supabaseConfigurationError ?? 'Supabase ainda não está configurado no ambiente.' };
       try {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-        return error ? { error: error.message } : {};
+        const { error } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password });
+        return error ? { error: authErrorMessage(error) } : {};
       } catch (error) {
         return { error: authErrorMessage(error) };
       }
@@ -98,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!supabase) return {};
       try {
         const { error } = await supabase.auth.signOut();
-        return error ? { error: error.message } : {};
+        return error ? { error: authErrorMessage(error) } : {};
       } catch (error) {
         return { error: authErrorMessage(error) };
       }
@@ -106,10 +140,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword: async (email) => {
       if (!supabase) return { error: supabaseConfigurationError ?? 'Supabase ainda não está configurado no ambiente.' };
       try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
           redirectTo: `${window.location.origin}/`
         });
-        return error ? { error: error.message } : {};
+        return error ? { error: authErrorMessage(error) } : {};
       } catch (error) {
         return { error: authErrorMessage(error) };
       }
