@@ -60,6 +60,11 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=Q1LiWKc8-Ls',
     source: 'TeamSnap — The Mikan Drill'
   },
+  'fn-02': {
+    youtubeId: 'uEcNJnXR3fs',
+    videoUrl: 'https://www.youtube.com/watch?v=uEcNJnXR3fs',
+    source: 'Baller Boot Camp — Basketball Floater Breakdown: How to shoot a floater'
+  },
   'fn-03': {
     youtubeId: 'YlLibwaQJF0',
     videoUrl: 'https://www.youtube.com/watch?v=YlLibwaQJF0',
@@ -69,6 +74,11 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     youtubeId: 'TXwUjMcJT3Y',
     videoUrl: 'https://www.youtube.com/watch?v=TXwUjMcJT3Y',
     source: 'Ryan Bennett — Same Foot Same Hand Layup'
+  },
+  'fn-05': {
+    youtubeId: 'Tnmcl9ZqYZ4',
+    videoUrl: 'https://www.youtube.com/watch?v=Tnmcl9ZqYZ4',
+    source: 'Baller Boot Camp — Reverse Layup Tutorial: How To Make Reverse Layups In Basketball'
   },
   'pnr-01': {
     youtubeId: '3hRXONs0B8E',
