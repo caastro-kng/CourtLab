@@ -80,6 +80,16 @@ export const EXERCISE_VIDEO_SOURCES: Record<string, ExerciseVideoSource> = {
     videoUrl: 'https://www.youtube.com/watch?v=Tnmcl9ZqYZ4',
     source: 'Baller Boot Camp — Reverse Layup Tutorial: How To Make Reverse Layups In Basketball'
   },
+  'fw-01': {
+    youtubeId: 'qGO5U5H-DQE',
+    videoUrl: 'https://www.youtube.com/watch?v=qGO5U5H-DQE',
+    source: 'Coach Lynch Basketball — Stride Stop Footwork'
+  },
+  'fw-02': {
+    youtubeId: 'Ggg1unQOFfY',
+    videoUrl: 'https://www.youtube.com/watch?v=Ggg1unQOFfY',
+    source: 'Jr. NBA Jr. WNBA — The Jab Step Breakdown Drill'
+  },
   'pnr-01': {
     youtubeId: '3hRXONs0B8E',
     videoUrl: 'https://www.youtube.com/watch?v=3hRXONs0B8E',
