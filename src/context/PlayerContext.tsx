@@ -63,6 +63,20 @@ type ProfileRow = {
   primary_goals: string[] | null;
 };
 
+type PlayerStatePayload = {
+  skillsRating: SkillRating[];
+  xp: number;
+  weeklyPlan: DayPlan[];
+  goals: Goal[];
+  workoutLogs: WorkoutSessionLog[];
+  customWorkouts: Workout[];
+};
+
+type PlayerStateRow = {
+  id: string;
+  state: Partial<PlayerStatePayload> | null;
+};
+
 const BASE_PROFILE: PlayerProfile = {
   name: 'Jogador',
   age: 18,
@@ -145,43 +159,35 @@ const INITIAL_GOALS: Goal[] = [
 ];
 
 const INITIAL_LOGS: WorkoutSessionLog[] = [];
+const LEGACY_STATE_KEYS = ['courtlab_skills', 'courtlab_xp', 'courtlab_weekly_plan', 'courtlab_goals', 'courtlab_logs', 'courtlab_custom_workouts'];
+const scopedStorageKey = (key: string, userId?: string) => userId ? `${key}:${userId}` : key;
 
-const FRESH_START_VERSION = 'fresh-start-v1';
-const PROGRESS_STORAGE_KEYS = [
-  'courtlab_xp',
-  'courtlab_weekly_plan',
-  'courtlab_goals',
-  'courtlab_logs',
-  'courtlab_custom_workouts',
-  'courtlab_active_workout'
-];
-
-const ensureFreshStart = () => {
-  try {
-    if (localStorage.getItem('courtlab_progress_version') === FRESH_START_VERSION) return;
-    PROGRESS_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
-    localStorage.setItem('courtlab_progress_version', FRESH_START_VERSION);
-  } catch {
-    // The app can still use in-memory zeroed defaults when storage is unavailable.
-  }
-};
+const normalizePlayerState = (state?: Partial<PlayerStatePayload> | null): PlayerStatePayload => ({
+  skillsRating: Array.isArray(state?.skillsRating) ? state!.skillsRating! : INITIAL_SKILLS,
+  xp: typeof state?.xp === 'number' && Number.isFinite(state.xp) ? Math.max(0, state.xp) : 0,
+  weeklyPlan: Array.isArray(state?.weeklyPlan) ? state!.weeklyPlan! : INITIAL_WEEKLY_PLAN,
+  goals: Array.isArray(state?.goals) ? state!.goals! : INITIAL_GOALS,
+  workoutLogs: Array.isArray(state?.workoutLogs) ? state!.workoutLogs! : INITIAL_LOGS,
+  customWorkouts: Array.isArray(state?.customWorkouts) ? state!.customWorkouts! : []
+});
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  ensureFreshStart();
   const { user } = useAuth();
   const authName = typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : '';
+  const userId = user?.id;
 
   const [profile, setProfile] = useState<PlayerProfile>(() => profileFromAuth(authName));
-  const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage('courtlab_skills', INITIAL_SKILLS));
-  const [xp, setXp] = useState<number>(() => readNumberStorage('courtlab_xp', 0));
-  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN));
-  const [goals, setGoals] = useState<Goal[]>(() => readStorage('courtlab_goals', INITIAL_GOALS));
-  const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => readStorage('courtlab_logs', INITIAL_LOGS));
-  const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => readStorage('courtlab_custom_workouts', []));
-  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(() => readStorage('courtlab_active_workout', null));
+  const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage(scopedStorageKey('courtlab_skills', userId), INITIAL_SKILLS));
+  const [xp, setXp] = useState<number>(() => readNumberStorage(scopedStorageKey('courtlab_xp', userId), 0));
+  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage(scopedStorageKey('courtlab_weekly_plan', userId), INITIAL_WEEKLY_PLAN));
+  const [goals, setGoals] = useState<Goal[]>(() => readStorage(scopedStorageKey('courtlab_goals', userId), INITIAL_GOALS));
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => readStorage(scopedStorageKey('courtlab_logs', userId), INITIAL_LOGS));
+  const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => readStorage(scopedStorageKey('courtlab_custom_workouts', userId), []));
+  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(() => readStorage(scopedStorageKey('courtlab_active_workout', userId), null));
   const [isLoggedInDemo, setIsLoggedInDemo] = useState<boolean>(true);
+  const [cloudHydrated, setCloudHydrated] = useState(false);
 
   useEffect(() => {
     if (!user || !supabase) return;
@@ -222,13 +228,127 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [user?.id]);
 
-  useEffect(() => writeStorage('courtlab_skills', skillsRating), [skillsRating]);
-  useEffect(() => writeStorage('courtlab_xp', String(xp)), [xp]);
-  useEffect(() => writeStorage('courtlab_weekly_plan', weeklyPlan), [weeklyPlan]);
-  useEffect(() => writeStorage('courtlab_goals', goals), [goals]);
-  useEffect(() => writeStorage('courtlab_logs', workoutLogs), [workoutLogs]);
-  useEffect(() => writeStorage('courtlab_custom_workouts', customWorkouts), [customWorkouts]);
-  useEffect(() => writeStorage('courtlab_active_workout', activeWorkout), [activeWorkout]);
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    let cancelled = false;
+    setCloudHydrated(false);
+
+    const hydratePlayerState = async () => {
+      const { data, error } = await supabase
+        .from('player_state')
+        .select('id,state')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('CourtLab player state load failed:', error.message);
+        const fallback = normalizePlayerState({
+          skillsRating: readStorage(scopedStorageKey('courtlab_skills', user.id), INITIAL_SKILLS),
+          xp: readNumberStorage(scopedStorageKey('courtlab_xp', user.id), 0),
+          weeklyPlan: readStorage(scopedStorageKey('courtlab_weekly_plan', user.id), INITIAL_WEEKLY_PLAN),
+          goals: readStorage(scopedStorageKey('courtlab_goals', user.id), INITIAL_GOALS),
+          workoutLogs: readStorage(scopedStorageKey('courtlab_logs', user.id), INITIAL_LOGS),
+          customWorkouts: readStorage(scopedStorageKey('courtlab_custom_workouts', user.id), [])
+        });
+        setSkillsRating(fallback.skillsRating);
+        setXp(fallback.xp);
+        setWeeklyPlan(fallback.weeklyPlan);
+        setGoals(fallback.goals);
+        setWorkoutLogs(fallback.workoutLogs);
+        setCustomWorkouts(fallback.customWorkouts);
+        setCloudHydrated(true);
+        return;
+      }
+
+      if (data) {
+        const remote = normalizePlayerState((data as PlayerStateRow).state);
+        setSkillsRating(remote.skillsRating);
+        setXp(remote.xp);
+        setWeeklyPlan(remote.weeklyPlan);
+        setGoals(remote.goals);
+        setWorkoutLogs(remote.workoutLogs);
+        setCustomWorkouts(remote.customWorkouts);
+        setCloudHydrated(true);
+        return;
+      }
+
+      const migrated = normalizePlayerState({
+        skillsRating: readStorage('courtlab_skills', INITIAL_SKILLS),
+        xp: readNumberStorage('courtlab_xp', 0),
+        weeklyPlan: readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN),
+        goals: readStorage('courtlab_goals', INITIAL_GOALS),
+        workoutLogs: readStorage('courtlab_logs', INITIAL_LOGS),
+        customWorkouts: readStorage('courtlab_custom_workouts', [])
+      });
+
+      setSkillsRating(migrated.skillsRating);
+      setXp(migrated.xp);
+      setWeeklyPlan(migrated.weeklyPlan);
+      setGoals(migrated.goals);
+      setWorkoutLogs(migrated.workoutLogs);
+      setCustomWorkouts(migrated.customWorkouts);
+
+      const { error: insertError } = await supabase
+        .from('player_state')
+        .upsert({ id: user.id, state: migrated }, { onConflict: 'id' });
+
+      if (insertError) {
+        console.error('CourtLab player state creation failed:', insertError.message);
+      } else {
+        try {
+          LEGACY_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
+        } catch {
+          // Cloud data remains the source of truth if local storage is unavailable.
+        }
+      }
+
+      if (!cancelled) setCloudHydrated(true);
+    };
+
+    void hydratePlayerState();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!userId) return;
+    writeStorage(scopedStorageKey('courtlab_active_workout', userId), activeWorkout);
+  }, [activeWorkout, userId]);
+
+  useEffect(() => {
+    if (!cloudHydrated || !user || !supabase) return;
+
+    const payload: PlayerStatePayload = {
+      skillsRating,
+      xp,
+      weeklyPlan,
+      goals,
+      workoutLogs,
+      customWorkouts
+    };
+
+    writeStorage(scopedStorageKey('courtlab_skills', user.id), skillsRating);
+    writeStorage(scopedStorageKey('courtlab_xp', user.id), String(xp));
+    writeStorage(scopedStorageKey('courtlab_weekly_plan', user.id), weeklyPlan);
+    writeStorage(scopedStorageKey('courtlab_goals', user.id), goals);
+    writeStorage(scopedStorageKey('courtlab_logs', user.id), workoutLogs);
+    writeStorage(scopedStorageKey('courtlab_custom_workouts', user.id), customWorkouts);
+
+    const saveTimer = window.setTimeout(() => {
+      void supabase
+        .from('player_state')
+        .upsert({ id: user.id, state: payload }, { onConflict: 'id' })
+        .then(({ error }) => {
+          if (error) console.error('CourtLab player state save failed:', error.message);
+        });
+    }, 500);
+
+    return () => window.clearTimeout(saveTimer);
+  }, [cloudHydrated, customWorkouts, goals, skillsRating, user?.id, weeklyPlan, workoutLogs, xp]);
 
   const tier = getTierFromXp(xp);
 
