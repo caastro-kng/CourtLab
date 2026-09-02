@@ -12,6 +12,22 @@ export type SkillCategory =
 
 export type DifficultyLevel = 'Iniciante' | 'Intermediário' | 'Avançado' | 'Competitivo';
 
+export type TrainingFocus =
+  | 'ball-handle'
+  | 'shooting'
+  | 'finishing'
+  | 'passing'
+  | 'defense'
+  | 'athletic'
+  | 'complete';
+
+export interface OnboardingAnswers {
+  trainingFocus: TrainingFocus;
+  level: DifficultyLevel;
+  trainingDaysPerWeek: 2 | 3 | 4 | 5 | 6;
+  sessionDurationMinutes: 30 | 45 | 60;
+}
+
 export type EquipmentType =
   | 'Sem equipamento'
   | '1 bola'
@@ -166,6 +182,10 @@ export interface PlayerProfile {
   avatarUrl?: string;
   bio?: string;
   city?: string;
+  onboardingCompleted: boolean;
+  trainingFocus?: TrainingFocus;
+  trainingDaysPerWeek?: number;
+  sessionDurationMinutes?: number;
 }
 
 export interface WorkoutSessionLog {

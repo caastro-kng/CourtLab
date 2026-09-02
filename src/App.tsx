@@ -6,9 +6,10 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { PlayerProvider } from './context/PlayerContext';
+import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import { Layout } from './components/layout/Layout';
 import { Auth } from './pages/Auth';
+import { Onboarding } from './pages/Onboarding';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const MyPlan = lazy(() => import('./pages/MyPlan').then((module) => ({ default: module.MyPlan })));
@@ -30,6 +31,43 @@ const PageFallback = () => (
   </div>
 );
 
+const PlayerGate: React.FC = () => {
+  const { playerReady, profile } = usePlayer();
+
+  if (!playerReady) {
+    return (
+      <div className="min-h-screen bg-[#080A0D] text-white flex items-center justify-center px-6">
+        <div className="flex items-center gap-3 text-sm text-[#9AA1AA]" role="status" aria-live="polite">
+          <span className="h-5 w-5 rounded-full border-2 border-[#2B3542] border-t-[#FF6B1A] animate-spin" aria-hidden="true" />
+          <span>Carregando seu perfil...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile.onboardingCompleted) return <Onboarding />;
+
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="plano" element={<MyPlan />} />
+          <Route path="treinar" element={<TrainHub />} />
+          <Route path="biblioteca" element={<Library />} />
+          <Route path="programas" element={<Programs />} />
+          <Route path="programas/:slug" element={<ProgramDetail />} />
+          <Route path="fundamentos" element={<Fundamentals />} />
+          <Route path="progresso" element={<Progress />} />
+          <Route path="metas" element={<Goals />} />
+          <Route path="perfil" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </Suspense>
+  );
+};
+
 const SessionGate: React.FC = () => {
   const { session, loading, passwordRecovery } = useAuth();
 
@@ -49,23 +87,7 @@ const SessionGate: React.FC = () => {
 
   return (
     <PlayerProvider>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="plano" element={<MyPlan />} />
-            <Route path="treinar" element={<TrainHub />} />
-            <Route path="biblioteca" element={<Library />} />
-            <Route path="programas" element={<Programs />} />
-            <Route path="programas/:slug" element={<ProgramDetail />} />
-            <Route path="fundamentos" element={<Fundamentals />} />
-            <Route path="progresso" element={<Progress />} />
-            <Route path="metas" element={<Goals />} />
-            <Route path="perfil" element={<Profile />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </Suspense>
+      <PlayerGate />
     </PlayerProvider>
   );
 };

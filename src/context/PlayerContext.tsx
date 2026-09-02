@@ -8,7 +8,8 @@ import {
   SkillProgressItem,
   Workout,
   PlayerTier,
-  Exercise
+  Exercise,
+  OnboardingAnswers
 } from '../types';
 import { WORKOUTS_DATA } from '../data/workouts';
 import { EXERCISES_DATA } from '../data/exercises';
@@ -16,10 +17,13 @@ import { calculateTrainingStreaks, deriveSkillProgress, getTierFromXp, XP_REWARD
 import { readNumberStorage, readStorage, writeStorage } from '../utils/storage';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
+import { createInitialGoals, createInitialWeeklyPlan, TRAINING_FOCUS } from '../utils/onboarding';
 
 interface PlayerContextType {
   profile: PlayerProfile;
+  playerReady: boolean;
   updateProfile: (updated: Partial<PlayerProfile>) => Promise<{ error?: string }>;
+  completeOnboarding: (answers: OnboardingAnswers) => Promise<{ error?: string }>;
   skillsRating: SkillRating[];
   updateSkillRating: (key: string, newScore: number) => void;
   topStrength: { name: string; score: number };
@@ -62,6 +66,10 @@ type ProfileRow = {
   bio: string | null;
   primary_goals: string[] | null;
   avatar_url: string | null;
+  onboarding_completed: boolean;
+  training_focus: PlayerProfile['trainingFocus'] | null;
+  training_days_per_week: number | null;
+  session_duration_minutes: number | null;
 };
 
 type PlayerStatePayload = {
@@ -88,7 +96,8 @@ const BASE_PROFILE: PlayerProfile = {
   level: 'Iniciante',
   primaryGoals: [],
   bio: '',
-  city: ''
+  city: '',
+  onboardingCompleted: false
 };
 
 const profileFromAuth = (name?: string | null): PlayerProfile => ({
@@ -107,7 +116,11 @@ const profileFromRow = (row: ProfileRow, fallback: PlayerProfile): PlayerProfile
   city: row.city ?? fallback.city,
   bio: row.bio ?? fallback.bio,
   primaryGoals: Array.isArray(row.primary_goals) ? row.primary_goals : fallback.primaryGoals,
-  avatarUrl: row.avatar_url ?? fallback.avatarUrl
+  avatarUrl: row.avatar_url ?? fallback.avatarUrl,
+  onboardingCompleted: row.onboarding_completed === true,
+  trainingFocus: row.training_focus ?? fallback.trainingFocus,
+  trainingDaysPerWeek: row.training_days_per_week ?? fallback.trainingDaysPerWeek,
+  sessionDurationMinutes: row.session_duration_minutes ?? fallback.sessionDurationMinutes
 });
 
 const profileToRow = (id: string, profile: PlayerProfile) => ({
@@ -122,7 +135,11 @@ const profileToRow = (id: string, profile: PlayerProfile) => ({
   city: profile.city || '',
   bio: profile.bio || '',
   primary_goals: profile.primaryGoals,
-  avatar_url: profile.avatarUrl || null
+  avatar_url: profile.avatarUrl || null,
+  onboarding_completed: profile.onboardingCompleted,
+  training_focus: profile.trainingFocus || null,
+  training_days_per_week: profile.trainingDaysPerWeek || null,
+  session_duration_minutes: profile.sessionDurationMinutes || null
 });
 
 const INITIAL_SKILLS: SkillRating[] = [
@@ -162,14 +179,16 @@ const INITIAL_GOALS: Goal[] = [
 ];
 
 const INITIAL_LOGS: WorkoutSessionLog[] = [];
+const EMPTY_WEEKLY_PLAN: DayPlan[] = [];
+const EMPTY_GOALS: Goal[] = [];
 const LEGACY_STATE_KEYS = ['courtlab_skills', 'courtlab_xp', 'courtlab_weekly_plan', 'courtlab_goals', 'courtlab_logs', 'courtlab_custom_workouts'];
 const scopedStorageKey = (key: string, userId?: string) => userId ? `${key}:${userId}` : key;
 
 const normalizePlayerState = (state?: Partial<PlayerStatePayload> | null): PlayerStatePayload => ({
   skillsRating: Array.isArray(state?.skillsRating) ? state!.skillsRating! : INITIAL_SKILLS,
   xp: typeof state?.xp === 'number' && Number.isFinite(state.xp) ? Math.max(0, state.xp) : 0,
-  weeklyPlan: Array.isArray(state?.weeklyPlan) ? state!.weeklyPlan! : INITIAL_WEEKLY_PLAN,
-  goals: Array.isArray(state?.goals) ? state!.goals! : INITIAL_GOALS,
+  weeklyPlan: Array.isArray(state?.weeklyPlan) ? state!.weeklyPlan! : EMPTY_WEEKLY_PLAN,
+  goals: Array.isArray(state?.goals) ? state!.goals! : EMPTY_GOALS,
   workoutLogs: Array.isArray(state?.workoutLogs) ? state!.workoutLogs! : INITIAL_LOGS,
   customWorkouts: Array.isArray(state?.customWorkouts) ? state!.customWorkouts! : []
 });
@@ -184,12 +203,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [profile, setProfile] = useState<PlayerProfile>(() => profileFromAuth(authName));
   const [skillsRating, setSkillsRating] = useState<SkillRating[]>(() => readStorage(scopedStorageKey('courtlab_skills', userId), INITIAL_SKILLS));
   const [xp, setXp] = useState<number>(() => readNumberStorage(scopedStorageKey('courtlab_xp', userId), 0));
-  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage(scopedStorageKey('courtlab_weekly_plan', userId), INITIAL_WEEKLY_PLAN));
-  const [goals, setGoals] = useState<Goal[]>(() => readStorage(scopedStorageKey('courtlab_goals', userId), INITIAL_GOALS));
+  const [weeklyPlan, setWeeklyPlan] = useState<DayPlan[]>(() => readStorage(scopedStorageKey('courtlab_weekly_plan', userId), EMPTY_WEEKLY_PLAN));
+  const [goals, setGoals] = useState<Goal[]>(() => readStorage(scopedStorageKey('courtlab_goals', userId), EMPTY_GOALS));
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutSessionLog[]>(() => readStorage(scopedStorageKey('courtlab_logs', userId), INITIAL_LOGS));
   const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => readStorage(scopedStorageKey('courtlab_custom_workouts', userId), []));
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(() => readStorage(scopedStorageKey('courtlab_active_workout', userId), null));
   const [isLoggedInDemo, setIsLoggedInDemo] = useState<boolean>(true);
+  const [profileHydrated, setProfileHydrated] = useState(false);
   const [cloudHydrated, setCloudHydrated] = useState(false);
 
   useEffect(() => {
@@ -197,12 +217,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let cancelled = false;
     const fallback = profileFromAuth(typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : '');
+    setProfileHydrated(false);
     setProfile(fallback);
 
     const hydrateProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id,name,age,height,weight,position,dominant_hand,level,city,bio,primary_goals,avatar_url')
+        .select('id,name,age,height,weight,position,dominant_hand,level,city,bio,primary_goals,avatar_url,onboarding_completed,training_focus,training_days_per_week,session_duration_minutes')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -210,11 +231,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (error) {
         console.error('CourtLab profile load failed:', error.message);
+        setProfileHydrated(true);
         return;
       }
 
       if (data) {
         setProfile(profileFromRow(data as ProfileRow, fallback));
+        setProfileHydrated(true);
         return;
       }
 
@@ -223,6 +246,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .upsert(profileToRow(user.id, fallback), { onConflict: 'id' });
 
       if (insertError) console.error('CourtLab profile creation failed:', insertError.message);
+      if (!cancelled) setProfileHydrated(true);
     };
 
     void hydrateProfile();
@@ -251,8 +275,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const fallback = normalizePlayerState({
           skillsRating: readStorage(scopedStorageKey('courtlab_skills', user.id), INITIAL_SKILLS),
           xp: readNumberStorage(scopedStorageKey('courtlab_xp', user.id), 0),
-          weeklyPlan: readStorage(scopedStorageKey('courtlab_weekly_plan', user.id), INITIAL_WEEKLY_PLAN),
-          goals: readStorage(scopedStorageKey('courtlab_goals', user.id), INITIAL_GOALS),
+          weeklyPlan: readStorage(scopedStorageKey('courtlab_weekly_plan', user.id), EMPTY_WEEKLY_PLAN),
+          goals: readStorage(scopedStorageKey('courtlab_goals', user.id), EMPTY_GOALS),
           workoutLogs: readStorage(scopedStorageKey('courtlab_logs', user.id), INITIAL_LOGS),
           customWorkouts: readStorage(scopedStorageKey('courtlab_custom_workouts', user.id), [])
         });
@@ -278,14 +302,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
-      const migrated = normalizePlayerState({
-        skillsRating: readStorage('courtlab_skills', INITIAL_SKILLS),
-        xp: readNumberStorage('courtlab_xp', 0),
-        weeklyPlan: readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN),
-        goals: readStorage('courtlab_goals', INITIAL_GOALS),
-        workoutLogs: readStorage('courtlab_logs', INITIAL_LOGS),
-        customWorkouts: readStorage('courtlab_custom_workouts', [])
-      });
+      let hasLegacyState = false;
+      try {
+        hasLegacyState = LEGACY_STATE_KEYS.some((key) => localStorage.getItem(key) !== null);
+      } catch {
+        // A new cloud profile can still start with an empty state if local storage is unavailable.
+      }
+
+      const migrated = hasLegacyState
+        ? normalizePlayerState({
+            skillsRating: readStorage('courtlab_skills', INITIAL_SKILLS),
+            xp: readNumberStorage('courtlab_xp', 0),
+            weeklyPlan: readStorage('courtlab_weekly_plan', INITIAL_WEEKLY_PLAN),
+            goals: readStorage('courtlab_goals', INITIAL_GOALS),
+            workoutLogs: readStorage('courtlab_logs', INITIAL_LOGS),
+            customWorkouts: readStorage('courtlab_custom_workouts', [])
+          })
+        : normalizePlayerState();
 
       setSkillsRating(migrated.skillsRating);
       setXp(migrated.xp);
@@ -398,6 +431,55 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return {};
   };
 
+  const completeOnboarding = async (answers: OnboardingAnswers) => {
+    if (!user || !supabase) {
+      return { error: 'Sua sessão não está disponível. Entre novamente para continuar.' };
+    }
+
+    const nextWeeklyPlan = createInitialWeeklyPlan(answers);
+    const nextGoals = createInitialGoals(answers);
+    const nextProfile: PlayerProfile = {
+      ...profile,
+      level: answers.level,
+      primaryGoals: [TRAINING_FOCUS[answers.trainingFocus].label],
+      onboardingCompleted: true,
+      trainingFocus: answers.trainingFocus,
+      trainingDaysPerWeek: answers.trainingDaysPerWeek,
+      sessionDurationMinutes: answers.sessionDurationMinutes
+    };
+    const nextState: PlayerStatePayload = {
+      skillsRating,
+      xp,
+      weeklyPlan: nextWeeklyPlan,
+      goals: nextGoals,
+      workoutLogs,
+      customWorkouts
+    };
+
+    const { error: stateError } = await supabase
+      .from('player_state')
+      .upsert({ id: user.id, state: nextState }, { onConflict: 'id' });
+
+    if (stateError) {
+      console.error('CourtLab onboarding state save failed:', stateError.message);
+      return { error: 'Não foi possível montar seu plano agora. Tente novamente.' };
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(profileToRow(user.id, nextProfile), { onConflict: 'id' });
+
+    if (profileError) {
+      console.error('CourtLab onboarding profile save failed:', profileError.message);
+      return { error: 'O plano foi preparado, mas não foi possível concluir seu perfil. Tente novamente.' };
+    }
+
+    setWeeklyPlan(nextWeeklyPlan);
+    setGoals(nextGoals);
+    setProfile(nextProfile);
+    return {};
+  };
+
   const updateSkillRating = (key: string, newScore: number) => {
     setSkillsRating((prev) =>
       prev.map((skill) =>
@@ -498,7 +580,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <PlayerContext.Provider
       value={{
         profile,
+        playerReady: profileHydrated && cloudHydrated,
         updateProfile,
+        completeOnboarding,
         skillsRating,
         updateSkillRating,
         topStrength,
